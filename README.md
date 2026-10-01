@@ -1,11 +1,36 @@
 # CHWords
 
-**WORDS**: a crossword tile game for the
-[CHGame](https://github.com/bateske/CH32SerialBoot) handheld, in the casino
-style of [CHBlackjack](https://github.com/bateske/CHBlackjack). Play the
-classic fifteen-by-fifteen board against three CPU opponents or a friend.
-14,160 words are built in, and a microSD card with the file `WORDS.DIC` on it
-brings that to all 168,551 words of the ENABLE list.
+![Twenty seconds against the HIGH ROLLER: PLAYERS across the centre for a bingo, the CPU thinking over the whole board and dropping its word in close up, two hints, and a look at the whole board](docs/gameplay.gif)
+
+A crossword tile game for the [CHGame](https://github.com/bateske/CH32SerialBoot)
+handheld (CH32X035 RISC-V, 128x128 colour LCD, piezo, microSD), in the casino
+of [CHBlackjack](https://github.com/bateske/CHBlackjack) and its tables: the
+classic fifteen-by-fifteen board in a wooden frame, a camera that plays
+close up - ivory tiles standing up off the felt, their letters in a serif
+face, the premium squares set into the board and labelled - and whips out
+to the whole board while the CPU thinks or while you hold B, then back in to
+watch the CPU's tiles drop onto it one by one. Your tiles slam down, a word
+lights up a tile at a time, each a note up the scale, and pays out in a
+float of gold; TRIPLE! shakes the table and BINGO! goes off in the rainbow
+for all seven tiles. Three CPU opponents, two players passing the handheld
+behind a curtain, and a hint when you are stuck.
+
+The point of it is the dictionary. **14,160 words live in the game itself**,
+in 12.4 KB of a 50 KB program, so it plays with nothing in the card slot;
+put the file `WORDS.DIC` on a microSD card and your words are checked
+against **all 168,551 words** of the ENABLE list (2 to 15 letters) instead.
+
+| Title | A bingo | The CPU's reply |
+|---|---|---|
+| ![title](docs/title.gif) | ![bingo](docs/bingo.gif) | ![cpu](docs/cpu.gif) |
+| **A hint** | **The end of a game** | |
+| ![hint](docs/hint.gif) | ![win](docs/win.gif) | |
+
+(Captured from the PC simulator in `tools/chsim`, which runs the real game
+and graphics code and renders what the device shows. **The game has been
+built and checked in the simulator only.** On the handheld itself nothing
+has been run yet: the SD card reader, the CPU's thinking time and the frame
+times are still to be tried there.)
 
 ## How to install
 
@@ -63,40 +88,6 @@ The same from the command line:
     arduino-cli upload  -b CHGame:ch32v:CHGame -p COMx CHWords
 
 That is 50.4 KB of the 50,944-byte program area. The last two flash pages are left for your saved game.
-
-## About the game
-
-A crossword tile game for the [CHGame](https://github.com/bateske/CH32SerialBoot)
-handheld (CH32X035 RISC-V, 128x128 colour LCD, piezo, microSD), in the casino
-of [CHBlackjack](https://github.com/bateske/CHBlackjack) and its tables: the
-classic fifteen-by-fifteen board in a wooden frame, a camera that plays
-close up - ivory tiles standing up off the felt, their letters in a serif
-face, the premium squares set into the board and labelled - and whips out
-to the whole board while the CPU thinks or while you hold B, then back in to
-watch the CPU's tiles drop onto it one by one. Your tiles slam down, a word
-lights up a tile at a time, each a note up the scale, and pays out in a
-float of gold; TRIPLE! shakes the table and BINGO! goes off in the rainbow
-for all seven tiles. Three CPU opponents, two players passing the handheld
-behind a curtain, and a hint when you are stuck.
-
-The point of it is the dictionary. **14,160 words live in the game itself**,
-in 12.4 KB of a 50 KB program, so it plays with nothing in the card slot;
-put the file `WORDS.DIC` on a microSD card and your words are checked
-against **all 168,551 words** of the ENABLE list (2 to 15 letters) instead.
-
-![Twenty seconds against the HIGH ROLLER: PLAYERS across the centre for a bingo, the CPU thinking over the whole board and dropping its word in close up, two hints, and a look at the whole board](docs/gameplay.gif)
-
-| Title | A bingo | The CPU's reply |
-|---|---|---|
-| ![title](docs/title.gif) | ![bingo](docs/bingo.gif) | ![cpu](docs/cpu.gif) |
-| **A hint** | **The end of a game** | |
-| ![hint](docs/hint.gif) | ![win](docs/win.gif) | |
-
-(Captured from the PC simulator in `tools/chsim`, which runs the real game
-and graphics code and renders what the device shows. **The game has been
-built and checked in the simulator only.** On the handheld itself nothing
-has been run yet: the SD card reader, the CPU's thinking time and the frame
-times are still to be tried there.)
 
 ## Playing
 
