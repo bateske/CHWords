@@ -355,6 +355,7 @@ static void glyph2(int x, int y, const uint8_t *cols, uint8_t n, uint8_t c) {
 static uint8_t shadeOf(uint8_t face) {
     switch (face) {
         case WHITE: return SILVER;
+        case SILVER: return BLUE;
         case FX_B:  return GOLD;
         case RED:   return WINE;
         case CYAN:  return BLUE;
@@ -375,7 +376,7 @@ static void boardTile(int x, int y, int p, uint8_t v, uint8_t face, uint8_t ink,
         y -= lift + g;
         f += 2 * g;
     }
-    fillRound(x + t, y + t, f, f, r, WOOD);         // its thickness
+    fillRound(x + t, y + t, f, f, r, face == SILVER ? NAVY : WOOD);     // its thickness
     fillRound(x, y, f, f, r, face);
     uint8_t l = v & wd::LETTER;
     if (p >= 12) {
@@ -384,9 +385,7 @@ static void boardTile(int x, int y, int p, uint8_t v, uint8_t face, uint8_t ink,
         gfx_vline(x + f - 1, y + 1, f - 2, sh);
     }
     if (p >= 14) {
-        // The serif letter a pixel left of centre, with a drop shadow.
-        tileLetter(x, y + (f - 9) / 2 + 1, f, l, shadeOf(face));
-        tileLetter(x - 1, y + (f - 9) / 2, f, l, ink);
+        tileLetter(x, y + (f - 9) / 2, f, l, ink, shadeOf(face));
     }
     else if (l == 13 || l == 23) glyph(x + (f - 5) / 2, y + (f - 5) / 2, l == 13 ? WIDE_M : WIDE_W, 5, ink);
     else glyph(x + (f - 3) / 2, y + (f - 5) / 2, FONT35['A' + l - 1 - FONT35_FIRST], 3, ink);
@@ -460,11 +459,11 @@ static void drawBoard(bool play) {
                 if (play) for (uint8_t i = 0; i < tent.n; i++)
                     if (tent.p[i].cell == cell) {
                         v = tent.p[i].tile;
-                        face = SKIN;
+                        face = SILVER;                                                  // the chess set's dark pieces: grey, blue, navy
                         lift = cell == slamCell && slamT ? slamT * slamT / 2 : 1;      // laid out, not yet played: held up
                     }
                 if (v && (v & wd::BLANK)) ink = RED;
-                if (denyT && (denyT & 4) && (denyWord ? inSpan(denySpan, cell, 15) : face == SKIN)) { face = RED; ink = WHITE; }
+                if (denyT && (denyT & 4) && (denyWord ? inSpan(denySpan, cell, 15) : face == SILVER)) { face = RED; ink = WHITE; }
                 if (pass == 0) { if (!v || lift) square(x, y, cell); }
                 else if (v) boardTile(x, y, zs, v, face, ink, lift);
             }
@@ -478,8 +477,7 @@ static void rackTile(int x, int y, uint8_t t, uint8_t face) {
     gfx_hline(x + 1, y + 16, 11, shadeOf(face));
     gfx_vline(x + 12, y + 1, 15, shadeOf(face));
     if (t == wd::BLANK_TILE) return;
-    tileLetter(x, y + 3, 13, t, shadeOf(face));
-    tileLetter(x - 1, y + 2, 13, t, INK);
+    tileLetter(x, y + 2, 13, t, INK, shadeOf(face));
     char s[3];
     uint8_t val = wd::VALUE[t];
     fmtInt(s, val);
@@ -566,7 +564,7 @@ static void drawPicker(uint32_t frame) {
     for (uint8_t i = 0; i < 26; i++) {
         int x = 15 + (i % 7) * 14, y = 39 + (i / 7) * 13;
         if (i == pickSel) fillRound(x, y, 13, 13, 1, (frame & 16) ? FX_B : GOLD);
-        tileLetter(x, y + 2, 13, (uint8_t)(i + 1), i == pickSel ? INK : WHITE);
+        tileLetter(x, y + 2, 13, (uint8_t)(i + 1), i == pickSel ? INK : WHITE, i == pickSel ? WOOD : BLUE);
     }
 }
 

@@ -31,8 +31,10 @@ void dither(int x, int y, int w, int h, uint8_t c, uint8_t phase);      // 50% c
 void glyph(int x, int y, const uint8_t *cols, uint8_t ncols, uint8_t c);
 
 // A letter (1..26) in the tiles' serif face (Assets TILEFONT, 9 rows from
-// its top to the baseline), centred in w pixels from x.
-void tileLetter(int x, int y, int w, uint8_t letter, uint8_t c);
+// its top to the baseline) on a tile face w pixels wide from x: a pixel
+// left of centre, with a drop shadow a pixel down and right in `shadow`,
+// both kept clear of the face's right-hand bevel.
+void tileLetter(int x, int y, int w, uint8_t letter, uint8_t c, uint8_t shadow);
 
 // PPOT's 3x5 font: 4 px advance, '~' = 2 px space, newline = 7 px down.
 int  text35(int x, int y, const char *str, uint8_t c);

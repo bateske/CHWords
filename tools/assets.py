@@ -241,7 +241,7 @@ def main():
     for ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
         rows = glyphs[ch]
         w = max(len(r) for r in rows)
-        assert w <= 13 and 8 <= len(rows) <= 23, ch
+        assert w <= 11 and 8 <= len(rows) <= 23, ch
         data.append(w | (len(rows) - 8) << 4)
         bits = "".join(r.ljust(w, ".") for r in rows).replace("#", "1").replace(".", "0")
         bits += "0" * (-len(bits) % 8)

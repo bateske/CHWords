@@ -1,5 +1,5 @@
 # The close-up's and the rack's letters (CHCrossword's tools/tilefont.py:
-# DejaVu Serif Bold, size 12; W a column narrower). Rows from the capitals' top; the baseline is row 8.
+# DejaVu Serif Bold, size 12; M and W from DejaVu Serif Condensed Bold, W a column narrower, so letter and shadow fit a 13 px face). Rows from the capitals' top; the baseline is row 8.
 
 = A
 ....##....
@@ -134,15 +134,15 @@
 #######
 
 = M
-####.....###
-.###....###.
-.#.##...###.
-.#.##..#.##.
-.#..##.#.##.
-.#..##.#.##.
-.#...##..##.
-.#...##..##.
-###.....####
+####....###
+.###....##.
+.#.##..###.
+.#.##..###.
+.#.##.#.##.
+.#..###.##.
+.#..##..##.
+.#...#..##.
+###....####
 
 = N
 ###....###
@@ -246,15 +246,15 @@
 ....##....
 
 = W
-###...##..###
-##...###...#.
-##...###...#.
-.##..#.##.#..
-.##.##.##.#..
-.##.#..##.#..
-..###..###...
-..###...##...
-..##....##...
+###..##..##
+##...##..#.
+##..###..#.
+###.###..#.
+.##.#.###..
+.###..###..
+.###..###..
+..##..###..
+..#....#...
 
 = X
 #####.###
