@@ -383,7 +383,11 @@ static void boardTile(int x, int y, int p, uint8_t v, uint8_t face, uint8_t ink,
         gfx_hline(x + 1, y + f - 1, f - 2, sh);
         gfx_vline(x + f - 1, y + 1, f - 2, sh);
     }
-    if (p >= 14) tileLetter(x, y + (f - 9) / 2, f, l, ink);
+    if (p >= 14) {
+        // The serif letter a pixel left of centre, with a drop shadow.
+        tileLetter(x, y + (f - 9) / 2 + 1, f, l, shadeOf(face));
+        tileLetter(x - 1, y + (f - 9) / 2, f, l, ink);
+    }
     else if (l == 13 || l == 23) glyph(x + (f - 5) / 2, y + (f - 5) / 2, l == 13 ? WIDE_M : WIDE_W, 5, ink);
     else glyph(x + (f - 3) / 2, y + (f - 5) / 2, FONT35['A' + l - 1 - FONT35_FIRST], 3, ink);
 }
@@ -474,11 +478,18 @@ static void rackTile(int x, int y, uint8_t t, uint8_t face) {
     gfx_hline(x + 1, y + 16, 11, shadeOf(face));
     gfx_vline(x + 12, y + 1, 15, shadeOf(face));
     if (t == wd::BLANK_TILE) return;
-    tileLetter(x, y + 2, 13, t, INK);
+    tileLetter(x, y + 3, 13, t, shadeOf(face));
+    tileLetter(x - 1, y + 2, 13, t, INK);
     char s[3];
     uint8_t val = wd::VALUE[t];
     fmtInt(s, val);
     text35(x + (val >= 10 ? 4 : 8), y + 11, s, WOOD);
+}
+
+// The way the word runs, hopping: a sprite's top left at (x, y).
+static void arrow(int x, int y, uint32_t frame) {
+    static const int8_t HOP[4] = {0, -1, -2, -1};
+    sprite4(down ? ARROW_D : ARROW_R, x, y + HOP[(frame >> 3) & 3], RM_ID);
 }
 
 static void drawRack(uint32_t frame) {
@@ -496,7 +507,7 @@ static void drawRack(uint32_t frame) {
         if (mode == SWAP && (swapMarks >> i & 1)) { y -= 2; face = CYAN; }
         if (sel) y -= 2;
         rackTile(x, y, t, face);
-        if (sel) roundRect(x - 1, y - 1, 15, 19, 1, (frame & 16) ? FX_B : GOLD);
+        if (sel) roundRect(x - 1, y - 1, 17, 21, 2, FX_A);          // round the face and its thickness, in the rainbow
     }
     // Beside the rack: what the laid-out tiles would score, and the way the word runs.
     char buf[8];
@@ -505,7 +516,7 @@ static void drawRack(uint32_t frame) {
         else fmtStr(buf, "--");
         text35(127 - text35Width(buf), top + 4, buf, tentScore >= 0 ? FX_B : RED);
     }
-    if (mine && mode != SWAP) glyph2(115, top + 11, FONT35[(down ? 'V' : '>') - FONT35_FIRST], 3, FELT_LT);
+    if (mine && mode != SWAP) arrow(116, top + 11, frame);
 }
 
 static void drawHud() {
@@ -538,11 +549,7 @@ static void drawCursor(uint32_t frame) {
     if (zs >= 12) gfx_rect(x - 2, y - 2, zs + 3, zs + 3, INK);
     if (mode == RACK || mode == PICK) {
         // Where the next tile goes, and which way the word runs from it.
-        if (!game::board[cursor]) {
-            const uint8_t *g = FONT35[(down ? 'V' : '>') - FONT35_FIRST];
-            if (zs >= 12) { gfx_fillRect(x + 1, y + 1, zs - 3, zs - 3, INK); glyph2(x + zs / 2 - 3, y + zs / 2 - 5, g, 3, FX_B); }
-            else glyph(x + 2, y + 1, g, 3, FX_B);
-        }
+        if (!game::board[cursor]) arrow(x + (zs - 10) / 2, y + (zs - 8) / 2, frame);
         // The glove, over the chosen tile (unless it would hide the square).
         int top = rackTop();
         if (mode == RACK && y + zs < top - 18) {
@@ -597,8 +604,8 @@ bool render(uint32_t frame, uint32_t ui) {
     bool moving = fx::activeRows(lo, hi) || anim != A_NONE || denyT || slamT;
     if (wasMoving && !moving) dirty = true;         // once more, to clear up after it
     wasMoving = moving;
-    // Still: the blinks step every 16 frames, and the palette does the rest.
-    uint32_t sig = (frame >> 4) ^ (ui << 8) ^ ((uint32_t)cursor << 16) ^ ((uint32_t)mode << 24) ^ ((uint32_t)rackSel << 27) ^
+    // Still: the blinks and the arrow's hop step every 8 frames, and the palette does the rest.
+    uint32_t sig = (frame >> 3) ^ (ui << 8) ^ ((uint32_t)cursor << 16) ^ ((uint32_t)mode << 24) ^ ((uint32_t)rackSel << 27) ^
                    ((uint32_t)pickSel * 2654435761u) ^ ((uint32_t)swapMarks << 3) ^ (cpuThinking ? ai::progress() >> 3 : 0) ^
                    ((uint32_t)down << 30);
     if (!moving && !dirty && sig == lastSig) return false;

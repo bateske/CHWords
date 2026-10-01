@@ -6,7 +6,7 @@ of CHChess and CHBackgammon: the input and frame pacing (src/CHGame.*),
 palette, drawing, outlined lettering, effects, sound sequencer, flash saving,
 debug protocol and the PC simulator and tools, adapted here; CHBackgammon's
 display font (tools/art/font.txt, its capitals); and CHChess's pointing glove
-(tools/art/hand.txt). CHBlackjack is a derivative of "Blackjack" for the
+(tools/art/hand.png). CHBlackjack is a derivative of "Blackjack" for the
 Arduboy by Press Play On Tape (Apache-2.0); the 3x5 pixel font in
 src/gfx/Draw.cpp is Press Play On Tape's.
 

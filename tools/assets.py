@@ -3,8 +3,9 @@
     python tools/assets.py         # build src/assets/*, write previews to build/assets/
 
 Sources, all in tools/art/:
-  * hand.png if present (palette-exact, hand-finished), else the palette
-    letters in hand.txt: the pointing glove.
+  * hand.png if present (palette-exact, hand-finished: CHChess's), else the
+    palette letters in hand.txt: the pointing glove.
+  * arrow.txt: the way the word runs (right; down is it turned on its side).
   * font.txt: the display font.
   * tilefont.txt: the tiles' letters close up and in the rack (DejaVu Serif
     Bold, from CHCrossword).
@@ -207,6 +208,18 @@ def main():
                  f"constexpr uint8_t HAND_TIP = {(tip[0] + tip[-1]) // 2};                           // its column")
     total += len(data)
     preview("hand", [hand, hand[::-1]])
+
+    # The arrows: right as drawn, down turned on its side (the light then
+    # comes from the left).
+    right = source("arrow")
+    down = [list(col) for col in zip(*right)]
+    data = pack_span4(right)
+    defs.append(c_array("ARROW_R", data))
+    data2 = pack_span4(down)
+    defs.append(c_array("ARROW_D", data2))
+    decls.append(f"extern const uint8_t ARROW_R[{len(data)}], ARROW_D[{len(data2)}];   // span4, {len(right[0])} x {len(right)}: the way the word runs")
+    total += len(data) + len(data2)
+    preview("arrow", [right, down])
 
     # The display font.
     font = load_font()
