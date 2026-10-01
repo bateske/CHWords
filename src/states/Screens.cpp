@@ -225,18 +225,18 @@ static void titleUpdate() {
 }
 
 static void titleRender(uint32_t frame) {
-    stage::renderBoard();
+    stage::renderTitle(frame);
     // The sign: a navy plaque framed in gold.
     fillRound(14, 3, 100, 24, 4, NAVY);
     roundRect(14, 3, 100, 24, 4, GOLD);
     heading("WORDS", 9);
     uint8_t items[5], n = titleItems(items);
     int y0 = 128 - n * 15;
-    dither(0, y0 - 14, 128, 128 - y0 + 14, INK, 1);
+    gfx_fillRect(0, y0 - 14, 128, 128 - y0 + 14, INK);
+    gfx_hline(0, y0 - 15, 128, GOLD);
     // Which list is in play.
     char buf[32], *p = fmtInt(buf, (int32_t)dict::count());
     fmtStr(p, dict::card() ? " WORDS ON THE CARD" : " WORDS  NO CARD");
-    gfx_fillRect(0, y0 - 14, 128, 9, INK);
     centred35(y0 - 12, buf, dict::card() ? CYAN : SILVER);
     for (uint8_t i = 0; i < n; i++) menuItem(y0 + i * 15, ITEM[items[i]], i == sel, frame);
 }
@@ -309,7 +309,6 @@ static void takeBack(uint8_t i) {
     for (; i + 1 < tent.n; i++) { tent.p[i] = tent.p[i + 1]; stage::tentSlot[i] = stage::tentSlot[i + 1]; }
     tent.n--;
     stage::retally();
-    stage::follow(stage::cursor);
     audio::sfx(Sfx::Lift);
 }
 
@@ -322,7 +321,7 @@ static void placeTile(uint8_t tile) {
     tent.p[tent.n] = {stage::cursor, tile};
     stage::tentSlot[tent.n++] = stage::rackSel;
     stage::retally();
-    audio::sfx(Sfx::Land);
+    stage::placed(stage::cursor);
     // On to the next empty square the way the word runs, and the next tile.
     uint8_t step = stage::down ? wd::SIZE : 1, c = stage::cursor;
     stage::mode = stage::BOARD;
@@ -335,7 +334,6 @@ static void placeTile(uint8_t tile) {
     uint8_t next = freeSlot(stage::rackSel, 1);
     if (next == 0xFF) stage::mode = stage::BOARD;
     else stage::rackSel = next;
-    stage::follow(stage::cursor);
 }
 
 static void shuffleRack() {
@@ -421,15 +419,19 @@ static void hintReady() {
     }
     stage::retally();
     stage::cursor = pl.p[0].cell;
-    stage::follow(stage::cursor);
     stage::mode = stage::BOARD;
     stage::note("START TO PLAY IT", GOLD);
     audio::sfx(Sfx::Coin);
 }
 
+// B held this long: the whole board.
+static const uint8_t PEEK_AFTER = 12;
+static uint8_t bHeld;
+
 static void playInput() {
     using namespace stage;
     bool a = arduboy.justPressed(A_BUTTON), b = arduboy.justPressed(B_BUTTON);
+    if (mode != BOARD) { bHeld = 0; peek = false; }
     int dx = arduboy.repeat(RIGHT_BUTTON) ? 1 : (arduboy.repeat(LEFT_BUTTON) ? -1 : 0);
     int dy = arduboy.repeat(DOWN_BUTTON) ? 1 : (arduboy.repeat(UP_BUTTON) ? -1 : 0);
     switch (mode) {
@@ -437,7 +439,6 @@ static void playInput() {
             int col = cursor % wd::SIZE + dx, row = cursor / wd::SIZE + dy;
             if ((dx || dy) && col >= 0 && col < wd::SIZE && row >= 0 && row < wd::SIZE) {
                 cursor = (uint8_t)(row * wd::SIZE + col);
-                follow(cursor);
                 audio::sfx(Sfx::Cursor);
             }
             if (a) {
@@ -450,7 +451,13 @@ static void playInput() {
                     audio::sfx(Sfx::Select);
                 } else audio::sfx(Sfx::Deny);
             }
-            if (b && tent.n) takeBack((uint8_t)(tent.n - 1));
+            // B: a tap takes the last tile back; held, the whole board.
+            if (arduboy.pressed(B_BUTTON)) { if (bHeld < 255) bHeld++; }
+            else {
+                if (bHeld && bHeld < PEEK_AFTER && tent.n) takeBack((uint8_t)(tent.n - 1));
+                bHeld = 0;
+            }
+            peek = bHeld >= PEEK_AFTER;
 #if !CHWD_LEAN
             if (arduboy.justPressed(SELECT_BUTTON)) {
                 recallAll();

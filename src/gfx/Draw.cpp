@@ -1,6 +1,7 @@
 #pragma GCC optimize("Os", "no-ipa-sra")
 #include <string.h>
 #include "Draw.h"
+#include "../assets/Assets.h"
 #include "../fx/Fx.h"
 #include "../RamFunc.h"     // hot loops run from SRAM
 
@@ -223,6 +224,21 @@ RAMFUNC(glyph) void glyph(int x, int y, const uint8_t *cols, uint8_t ncols, uint
         for (; bits; bits >>= 1, yy++, p += GFX_FB_STRIDE)
             if ((bits & 1) && (unsigned)yy < GFX_H) plot(p, x, c);
     }
+}
+
+RAMFUNC(tileletter) void tileLetter(int x, int y, int w, uint8_t letter, uint8_t c) {
+    const uint8_t *g = TILEFONT;
+    for (uint8_t k = 1; k < letter; k++) g += 1 + (((g[0] & 15) * ((g[0] >> 4) + 8) + 7) >> 3);
+    uint8_t gw = g[0] & 15, rows = (uint8_t)((g[0] >> 4) + 8);
+    x += (w - gw + 1) / 2;
+    c &= 0x0F;
+    uint16_t bit = 0;
+    for (uint8_t r = 0; r < rows; r++, y++)
+        for (uint8_t i = 0; i < gw; i++, bit++)
+            if ((g[1 + (bit >> 3)] << (bit & 7)) & 0x80) {
+                int xx = x + i;
+                if ((unsigned)xx < GFX_W && (unsigned)y < GFX_H) plot(gfx_fb + y * GFX_FB_STRIDE + (xx >> 1), xx, c);
+            }
 }
 
 RAMFUNC(text35) int text35(int x, int y, const char *str, uint8_t c) {

@@ -6,3 +6,5 @@ extern const uint8_t HAND[96];                            // span4, fingertip on
 constexpr uint8_t HAND_TIP = 6;                           // its column
 extern const uint8_t FONT[634];                         // the display font (tools/art/font.txt): per glyph its
                                                             // character, width, top << 4 | rows, the rows' bits; 0 ends
+extern const uint8_t TILEFONT[297];                     // the tiles' letters (tools/art/tilefont.txt): per glyph
+                                                          // width | (rows - 8) << 4, then the rows' bits

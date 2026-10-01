@@ -85,7 +85,6 @@ tap B
 tap B
 tap START
 wait 4
-tap DOWN
 tap A
 wait 4
 tap A

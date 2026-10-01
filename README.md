@@ -3,14 +3,18 @@
 A crossword tile game for the [CHGame](https://github.com/bateske/CH32SerialBoot)
 handheld (CH32X035 RISC-V, 128x128 colour LCD, piezo, microSD), in the casino
 of [CHBlackjack](https://github.com/bateske/CHBlackjack) and its tables: the
-classic fifteen-by-fifteen board with its premium squares, a hundred tiles,
-racks of seven, tiles that slam down, words that light up a letter at a time
-and pay out in a float of gold, BINGO! in the rainbow for all seven tiles,
-three CPU opponents, two players passing the handheld behind a curtain, and
-a hint when you are stuck.
+classic fifteen-by-fifteen board in a wooden frame, a camera that plays
+close up - ivory tiles standing up off the felt, their letters in a serif
+face, the premium squares set into the board and labelled - and whips out
+to the whole board while the CPU thinks or while you hold B, then back in to
+watch the CPU's tiles drop onto it one by one. Your tiles slam down, a word
+lights up a tile at a time, each a note up the scale, and pays out in a
+float of gold; TRIPLE! shakes the table and BINGO! goes off in the rainbow
+for all seven tiles. Three CPU opponents, two players passing the handheld
+behind a curtain, and a hint when you are stuck.
 
-The point of it is the dictionary. **20,216 words live in the game itself**,
-in 15.3 KB of a 50 KB program, so it plays with nothing in the card slot;
+The point of it is the dictionary. **16,318 words live in the game itself**,
+in 12.4 KB of a 50 KB program, so it plays with nothing in the card slot;
 put the file `WORDS.DIC` on a microSD card and your words are checked
 against **all 168,551 words** of the ENABLE list (2 to 15 letters) instead.
 
@@ -50,7 +54,7 @@ saved game. From the command line:
 `out/WORDS.DIC` (4 MB). Copy it to the root folder of a microSD card
 formatted FAT16 or FAT32 (not exFAT) and put the card in before switching
 on. The title screen says which list is in play: "168551 WORDS ON THE CARD"
-or "20216 WORDS  NO CARD".
+or "16318 WORDS  NO CARD".
 
 ## Playing
 
@@ -58,7 +62,7 @@ or "20216 WORDS  NO CARD".
 |---|---|---|---|
 | D-pad | move over the squares | left/right: choose a tile; up: turn the word across/down; down: shuffle the rack | menus |
 | A | on an empty square: go to the rack; on a tile you laid: take it back | lay the tile, and move on to the next square | select |
-| B | take your last tile back | back to the board | back |
+| B | tap: take your last tile back; hold: the whole board | back to the board | back |
 | START | the menu: PLAY, SWAP TILES, PASS, SAVE+QUIT | the same | |
 | SELECT | a hint: the best play the built-in list has, laid out for you | | |
 
@@ -83,12 +87,16 @@ PLAY, plays it. If a word is not in the list the tiles shake, the word
 flashes red, and they stay where they are for you to change: nothing is
 lost but your pride.
 
-**The board** shows all fifteen columns and twelve of the fifteen rows; it
-slides up and down to follow the cursor. Tiles you are laying are white; the
+**The board** is shown close up while you play: eight columns and six rows,
+the camera following the cursor (and keeping the first tile of the word you
+are laying in view). Hold B to see the whole board; let go to come back. The
+premium squares are set into the board, blue for the letter premiums (DL,
+TL) and red for the word premiums (DW, TW); from far off they show just
+"2" or "3". Tiles you are laying are peach and held up off the board; the
 last play made stays gold until the next.
 
 **Which words count.** With the card in, any ENABLE word. Without it, the
-20,216 in the game: every two- and three-letter word, the most common
+16,318 in the game: every two- and three-letter word, the most common
 longer ones (up to eight letters), and the words that plain endings make
 from those (walk, walks, walked, walking, walker, walkers). The CPU only
 ever plays words from the built-in list, so it never plays a word the card
@@ -120,7 +128,7 @@ the felt (green, blue, red, purple). Options, records and a game in progress
   * *Folding.* A word that a rule makes from another ("add S", "add ED",
     "drop the E and add ING", "change the Y to IES": 24 rules) is not
     stored; the base word carries the set of rules that make words from it.
-    20,216 words are 6,293 entries.
+    16,318 words are 5,127 entries.
   * *Front coding.* The entries are sorted, and each stores only the count
     of letters it shares with the one before, then the rest.
   * *Huffman coding by context.* Every symbol is Huffman coded with a table
@@ -142,19 +150,24 @@ the felt (green, blue, red, purple). Options, records and a game in progress
   one block read, with no index in RAM. The card is read with a small
   read-only driver (`src/sd`, from HypeRunner) that borrows the display's
   SPI between frames and hands it back as it found it.
-* **The tiles are drawn, not stored**: a rectangle and a letter in the 3x5
-  font (twice the size in the rack). The only art in the game is the glove
+* **The tiles are drawn, not stored**: rounded rectangles in two colours
+  (the face and its thickness) and a letter - close up and in the rack in a
+  serif face (DejaVu Serif Bold, 297 bytes for all 26), far off in the 3x5
+  font. The board is drawn at any square size from 8 to 16 pixels, which is
+  what lets the camera whip between them. The only stored art is the glove
   and the display font.
-* **Flash** (release build): 50,408 of 50,944 bytes, of which the dictionary
-  is 15,337. **RAM**: 15.4 KB of 18.4 KB static, of which 8 KB is the
-  framebuffer.
+* **Flash** (release build): 50,420 of 50,944 bytes, of which the dictionary
+  is 12,375. The camera, the raised tiles and the serif letters cost about
+  3 KB, which is about 3,900 words of the built-in list; with a card in it
+  makes no difference. **RAM**: 15.7 KB of 18.4 KB static, of which 8 KB is
+  the framebuffer.
 
 ## Development
 
     python tools/check.py            # host tests, every script in the simulator (twice), the device build
     python tools/tests/run_tests.py  # the host tests alone
     python tools/chsim/chdrive.py --sim . tools/scripts/ui.txt out/ui    # one script: screenshots in out/ui
-    python tools/dict/build_dict.py --bytes 15340    # rebuild the built-in list to a flash budget
+    python tools/dict/build_dict.py --bytes 12376    # rebuild the built-in list to a flash budget
     python tools/dict/build_sd.py    # out/WORDS.DIC, checked word by word
     python tools/assets.py           # the glove and the display font -> src/assets
 

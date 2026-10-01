@@ -42,7 +42,12 @@ static dictmask_t entry(uint8_t *w, uint8_t &len, bool first) {
     if (!first) len = sym(0);
     for (;;) {
         uint8_t s = sym(len ? (uint8_t)(1 + w[len - 1]) : 1);
-        if (s >= 26) return DICT_TERM[s - 26];
+        if (s >= 26) {
+            const uint8_t *t = DICT_TERM + (s - 26) * DICT_TERM_BYTES;
+            dictmask_t m = 0;
+            for (uint8_t k = DICT_TERM_BYTES; k--;) m = m << 8 | t[k];
+            return m;
+        }
         if (len < 15) w[len++] = (uint8_t)(s + 1);
     }
 }

@@ -6,6 +6,8 @@ Sources, all in tools/art/:
   * hand.png if present (palette-exact, hand-finished), else the palette
     letters in hand.txt: the pointing glove.
   * font.txt: the display font.
+  * tilefont.txt: the tiles' letters close up and in the rack (DejaVu Serif
+    Bold, from CHCrossword).
 
 The tiles, the board and the rack are drawn by the game itself (src/stage),
 letters in the 3x5 font: 27 kinds of tile would not fit as art.
@@ -212,6 +214,28 @@ def main():
     defs.append(c_array("FONT", data))
     decls.append(f"extern const uint8_t FONT[{len(data)}];                         // the display font (tools/art/font.txt): per glyph its\n"
                  "                                                            // character, width, top << 4 | rows, the rows' bits; 0 ends")
+    total += len(data)
+
+    # The tiles' letters: per glyph a byte (width | (rows - 8) << 4), then
+    # its pixels row by row, MSB first, to the next byte.
+    glyphs, cur = {}, None
+    for ln in (ART / "tilefont.txt").read_text().splitlines():
+        if ln.startswith("= "):
+            cur = glyphs.setdefault(ln[2], [])
+        elif ln.strip() and not ln.startswith("# "):
+            cur.append(ln.strip())
+    data = []
+    for ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+        rows = glyphs[ch]
+        w = max(len(r) for r in rows)
+        assert w <= 13 and 8 <= len(rows) <= 23, ch
+        data.append(w | (len(rows) - 8) << 4)
+        bits = "".join(r.ljust(w, ".") for r in rows).replace("#", "1").replace(".", "0")
+        bits += "0" * (-len(bits) % 8)
+        data += [int(bits[k:k + 8], 2) for k in range(0, len(bits), 8)]
+    defs.append(c_array("TILEFONT", data))
+    decls.append(f"extern const uint8_t TILEFONT[{len(data)}];                     // the tiles' letters (tools/art/tilefont.txt): per glyph\n"
+                 "                                                          // width | (rows - 8) << 4, then the rows' bits")
     total += len(data)
 
     # The palette, for whoever edits the art.

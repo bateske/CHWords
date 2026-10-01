@@ -18,6 +18,8 @@ namespace audio {
 bool begin(bool on);
 void setOn(bool on);
 void sfx(Sfx s);
+// One note (a word lighting up, a tile a step up the scale).
+void note(uint16_t hz, uint8_t ms);
 bool playing();                     // an effect is sounding
 void update();                      // once per frame: LED patterns
 

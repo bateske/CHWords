@@ -10,6 +10,11 @@ display font (tools/art/font.txt, its capitals); and CHChess's pointing glove
 Arduboy by Press Play On Tape (Apache-2.0); the 3x5 pixel font in
 src/gfx/Draw.cpp is Press Play On Tape's.
 
+The tiles' letters (tools/art/tilefont.txt) are CHCrossword's: rasterized
+from DejaVu Serif Bold. DejaVu is freely redistributable: Bitstream Vera
+Fonts Copyright (c) 2003 Bitstream, Inc.; DejaVu changes are in the public
+domain (https://dejavu-fonts.github.io/License.html).
+
 The SD card reader (src/sd) is from HypeRunner's clean-room SPI-mode driver
 and FAT reader, cut down to read-only single-block reads:
 

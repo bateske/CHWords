@@ -17,6 +17,7 @@ uint8_t simLast = 0xFF;
 bool begin(bool on) { simOn = on; return true; }
 void setOn(bool on) { simOn = on; }
 void sfx(Sfx s) { if (simOn) simLast = (uint8_t)s; }
+void note(uint16_t, uint8_t) {}
 bool playing() { return false; }
 void update() {}
 void led(Led) {}
@@ -170,6 +171,17 @@ void sfx(Sfx s) {
     __disable_irq();
     fxSteps = d.steps; fxN = d.n; fxI = 0; fxT = 0; fxPrio = d.prio;
     soft = s >= Sfx::Tick;
+    __enable_irq();
+}
+
+// A note of a word lighting up: it gives way only to the fanfares.
+static Step oneNote;
+void note(uint16_t hz, uint8_t ms) {
+    if (!started || (fxSteps && fxPrio > 2)) return;
+    __disable_irq();
+    oneNote.hz = (uint8_t)((hz + 10) / 20); oneNote.endHz = 0; oneNote.ms = (uint8_t)(ms / 2);
+    fxSteps = &oneNote; fxN = 1; fxI = 0; fxT = 0; fxPrio = 2;
+    soft = false;
     __enable_irq();
 }
 

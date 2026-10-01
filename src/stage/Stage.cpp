@@ -7,6 +7,7 @@
 #include "../CHGame.h"
 #include "../gfx/Palette.h"
 #include "../gfx/Draw.h"
+#include "../gfx/Mask.h"
 #include "../gfx/Fmt.h"
 #include "../fx/Fx.h"
 #include "../audio/Audio.h"
@@ -21,22 +22,34 @@ game::Play tent;
 uint8_t tentSlot[wd::RACK];
 int16_t tentScore;
 uint8_t cursor, rackSel, pickSel, swapMarks, mode, viewSide;
-bool down;
+bool down, peek;
 
-// Layout.
-static const int BX = 4, BY = 9, CELL = 8, VIEW_H = 96;      // the board's window: 15 x 12 squares
-static const int RACK_X = 2, RACK_Y = 109, TILE_W = 13, TILE_H = 17, TILE_PITCH = 15;
+// --- Layout -------------------------------------------------------------------
+static const int HUD_H = 8;             // the scores: rows 0..7
+static const int RACK_H = 24;           // the rack, when up: rows 104..127
+static const int FRAME = 4;             // the board's wooden frame
+static const uint8_t FAR = 8, NEAR = 16;    // square pitch: the whole board, close up
+static const int TILE_PITCH = 16;       // in the rack
 
-static uint8_t scrollY, scrollTo;       // px: 0..24
+// The camera: squares zs pixels apart (FAR, NEAR, or the sizes between
+// while it whips from one to the other), the board's corner drawn at
+// (-camX, -camY).
+static uint8_t zs = FAR;
+static int camX, camY;
+static uint8_t rackT;                   // the rack: 0 away .. 8 up
+static bool title;
 
-// The show.
+// --- The show -------------------------------------------------------------------
 enum Anim : uint8_t { A_NONE, A_DROP, A_SWEEP, A_FLOAT, A_NOTE };
 static uint8_t anim, animT;
 static uint8_t dropped;                 // of the CPU's tiles, how many have landed
 static int16_t shown[2];                // the scores on the HUD, counting up
-static int16_t floatX, floatY;          // the "+34" rising off the word
-static char floatText[6];
-static uint8_t floatT;
+static uint8_t slamCell = 0xFF, slamT;  // your last tile, on its way down
+
+// Floating text: the score off the word (in the display face), and what
+// the premium squares did (small).
+struct Float { int16_t x, y; uint8_t t, colour; char text[8]; };
+static Float floats[4];
 
 static char noteText[32];
 static uint8_t noteCol, noteT;
@@ -47,17 +60,41 @@ static bool denyWord;
 
 static bool dirty = true;
 
-// ---------------------------------------------------------------------------
-static inline int cellX(uint8_t cell) { return BX + (cell % SIZE) * CELL; }
-static inline int cellY(uint8_t cell) { return BY + (cell / SIZE) * CELL - scrollY; }
+// Notes for a word lighting up: up a major pentatonic scale.
+static const uint16_t SCALE[8] = {1319, 1568, 1760, 2093, 2349, 2637, 3136, 3520};
 
-void follow(uint8_t cell) {
-    int row = cell / SIZE, top = scrollTo / CELL;
-    if (row < top + 1) top = row - 1;
-    if (row > top + 10) top = row - 10;
-    if (top < 0) top = 0;
-    if (top > 3) top = 3;
-    scrollTo = (uint8_t)(top * CELL);
+// ---------------------------------------------------------------------------
+static int rackTop() { return 128 - (RACK_H * rackT) / 8; }
+static int cellX(uint8_t c) { return (c % SIZE) * zs - camX; }
+static int cellY(uint8_t c) { return (c / SIZE) * zs - camY; }
+static uint8_t middle(const wd::Span &s) { return (uint8_t)(s.start + (s.len / 2) * s.step); }
+
+static bool wantClose() {
+    return title || (!game::over && !peek && !cpuThinking);
+}
+
+// Where the camera should be: the square it follows in the middle of the
+// window; the board's frame kept to the window's edges, or the board
+// centred if it fits.
+static void camTarget(int &tx, int &ty) {
+    uint8_t c = anim != A_NONE && game::last.kind == game::PLAYED ? middle(game::last.main) : cursor;
+    // While a word is being laid out, its first tile stays in view too.
+    uint8_t a = tent.n && anim == A_NONE ? tent.p[0].cell : c;
+    int size = SIZE * zs, w = 128, h = rackTop() - HUD_H;
+    tx = (a % SIZE + c % SIZE) * zs / 2 + zs / 2 - w / 2;
+    ty = (a / SIZE + c / SIZE) * zs / 2 + zs / 2 - h / 2 - HUD_H;
+    if (tx > size + FRAME - w) tx = size + FRAME - w;
+    if (ty > size + FRAME - h - HUD_H) ty = size + FRAME - h - HUD_H;
+    if (tx < -FRAME) tx = -FRAME;
+    if (ty < -FRAME - HUD_H) ty = -FRAME - HUD_H;
+    if (size <= w) tx = -(w - size) / 2;
+    if (size <= h) ty = -(h - size) / 2 - HUD_H;
+}
+
+static bool settled() {
+    int tx, ty;
+    camTarget(tx, ty);
+    return zs == (wantClose() ? NEAR : FAR) && tx == camX && ty == camY;
 }
 
 bool slotFree(uint8_t slot) {
@@ -81,16 +118,18 @@ void newGame() {
     rackSel = 0;
     swapMarks = 0;
     mode = BOARD;
-    down = false;
+    down = peek = title = false;
     viewSide = game::setup.mode == game::VS_CPU ? 0 : game::turn;
     anim = A_NONE;
-    noteT = denyT = floatT = 0;
+    noteT = denyT = slamT = 0;
+    memset(floats, 0, sizeof floats);
     cpuThinking = nullptr;
     shown[0] = game::score[0];
     shown[1] = game::score[1];
-    scrollY = scrollTo = 8;
-    follow(cursor);
-    scrollY = scrollTo;
+    // The whole board to start with: the camera whips in.
+    zs = FAR;
+    rackT = 0;
+    camTarget(camX, camY);
     dirty = true;
 }
 
@@ -114,11 +153,37 @@ void deny(const wd::Span *word) {
     audio::sfx(Sfx::Deny);
 }
 
+void placed(uint8_t cell) {
+    slamCell = cell;
+    slamT = 6;
+    audio::sfx(Sfx::Lift);
+}
+
 // ---------------------------------------------------------------------------
 // The show
 // ---------------------------------------------------------------------------
 static void sparkle(uint8_t cell, fx::Kind k, uint8_t n, uint8_t colour) {
-    fx::burst(k, cellX(cell) + 3, cellY(cell) + 3, n, 22, colour);
+    fx::burst(k, cellX(cell) + zs / 2, cellY(cell) + zs / 2, n, 22, colour);
+}
+
+static void addFloat(int x, int y, const char *text, uint8_t colour) {
+    for (auto &f : floats) {
+        if (f.t) continue;
+        f.x = (int16_t)x;
+        f.y = (int16_t)y;
+        f.t = 60;
+        f.colour = colour;
+        strncpy(f.text, text, sizeof f.text - 1);
+        f.text[sizeof f.text - 1] = 0;
+        return;
+    }
+}
+
+// A tile lands: dust, a jolt, a knock.
+static void landed(uint8_t cell) {
+    sparkle(cell, fx::DUST, 6, FELT_LT);
+    fx::shake(3, 1);
+    audio::sfx(Sfx::Land);
 }
 
 void show(bool byCpu) {
@@ -129,7 +194,6 @@ void show(bool byCpu) {
     animT = 0;
     dirty = true;
     if (l.kind == game::PLAYED) {
-        follow((uint8_t)(l.main.start + (l.main.len / 2) * l.main.step));
         dropped = byCpu ? 0 : l.n;
         anim = byCpu ? A_DROP : A_SWEEP;
         return;
@@ -148,13 +212,73 @@ void show(bool byCpu) {
     anim = A_NOTE;
 }
 
+// The word has lit up: it pays, and the premium squares under the new tiles
+// say what they did.
+static void payout() {
+    const game::Last &l = game::last;
+    uint8_t mid = middle(l.main), best = 0;
+    char buf[8];
+    buf[0] = '+';
+    fmtInt(buf + 1, l.score);
+    addFloat(cellX(mid) + zs / 2, cellY(mid) - 2, buf, FX_B);
+    for (uint8_t i = 0; i < l.n; i++) {
+        uint8_t pr = wd::premium(l.cell[i]);
+        if (!pr) continue;
+        static const char *const SAYS[5] = {"", "2X", "3X", "2X WORD", "3X WORD"};
+        static const uint8_t SAY_COL[5] = {0, CYAN, CYAN, SKIN, RED};
+        addFloat(cellX(l.cell[i]) + zs / 2, cellY(l.cell[i]) + zs, SAYS[pr], SAY_COL[pr]);
+        if (pr > best) best = pr;
+    }
+    if (l.n == wd::RACK) {
+        fx::banner("BINGO!", fx::B_RAINBOW, 82, 90);
+        fx::fountain(40, 100, 18);
+        fx::fountain(88, 100, 18);
+        audio::sfx(Sfx::Doubles);
+        audio::led(audio::LED_PARTY);
+    } else if (best == wd::TW) {
+        fx::banner("TRIPLE!", fx::B_RED, 82, 70);
+        fx::shake(10, 2);
+        for (uint8_t i = 0; i < l.n; i++) sparkle(l.cell[i], fx::STAR, 4, GOLD);
+        audio::sfx(Sfx::Pickup);
+        audio::led(audio::LED_TRIPLE);
+    } else if (l.score >= 30) {
+        for (uint8_t i = 0; i < l.n; i++) sparkle(l.cell[i], fx::STAR, 4, GOLD);
+        audio::sfx(Sfx::Pickup);
+        audio::led(audio::LED_BLINK);
+    } else {
+        sparkle(mid, fx::SPARK, 8, GOLD);
+        audio::sfx(Sfx::Coin);
+    }
+}
+
 bool busy() { return anim != A_NONE || denyT; }
 
 void update() {
-    if (scrollY != scrollTo) { scrollY = (uint8_t)(scrollY < scrollTo ? scrollY + 2 : scrollY - 2); dirty = true; }
+    // The camera: it whips between the whole board and the close-up in four
+    // ticks, and pans after what it follows. The rack slides in and out.
+    uint8_t want = wantClose() ? NEAR : FAR;
+    bool rackWanted = want == NEAR && !title;
+    if (rackWanted && rackT < 8) { rackT++; dirty = true; }
+    if (!rackWanted && rackT) { rackT--; dirty = true; }
+    int tx, ty;
+    if (zs != want) {
+        if (zs == (want == NEAR ? FAR : NEAR)) audio::sfx(Sfx::Whoosh);
+        zs = (uint8_t)(zs < want ? zs + 2 : zs - 2);
+        camTarget(camX, camY);
+        dirty = true;
+    } else {
+        camTarget(tx, ty);
+        int dx = tx - camX, dy = ty - camY;
+        if (dx || dy) {
+            camX += dx / 3 + (dx > 0) - (dx < 0);
+            camY += dy / 3 + (dy > 0) - (dy < 0);
+            dirty = true;
+        }
+    }
     if (noteT && !--noteT) dirty = true;
     if (denyT && !--denyT) dirty = true;
-    if (floatT) { floatT--; dirty = true; }
+    if (slamT && !--slamT && slamCell != 0xFF) landed(slamCell);
+    for (auto &f : floats) if (f.t) { f.t--; if (f.t & 1) f.y--; dirty = true; }
     for (uint8_t s = 0; s < 2; s++) {
         int16_t d = (int16_t)(game::score[s] - shown[s]);
         if (!d || anim == A_DROP || anim == A_SWEEP) continue;
@@ -166,53 +290,35 @@ void update() {
     const game::Last &l = game::last;
     switch (anim) {
         case A_DROP:
-            // The CPU's tiles come down one after another.
-            if (scrollY != scrollTo) break;
-            if (++animT >= 7) {
+            // The CPU's tiles come down one after another, once the camera
+            // is there to watch.
+            if (!settled()) break;
+            dirty = true;
+            if (++animT >= 8) {
                 animT = 0;
-                sparkle(l.cell[dropped], fx::DUST, 5, FELT_LT);
-                fx::shake(3, 1);
-                audio::sfx(Sfx::Land);
+                landed(l.cell[dropped]);
                 if (++dropped >= l.n) anim = A_SWEEP;
             }
-            dirty = true;
             break;
         case A_SWEEP:
-            // The word lights up a letter at a time, then pays.
+            // The word lights up a tile at a time, each a note up the scale.
             dirty = true;
-            if (++animT < l.main.len * 3 + 6) {
-                if (animT % 3 == 1) audio::sfx(Sfx::Tock);
-                break;
+            if (animT % 4 == 0 && animT / 4 < l.main.len) {
+                uint8_t k = (uint8_t)(animT / 4);
+                audio::note(SCALE[k > 7 ? 7 : k], 50);
+                sparkle((uint8_t)(l.main.start + k * l.main.step), fx::SPARK, 3, FX_B);
             }
-            {
-                uint8_t mid = (uint8_t)(l.main.start + (l.main.len / 2) * l.main.step);
-                char *p = floatText;
-                *p++ = '+';
-                fmtInt(p, l.score);
-                floatX = (int16_t)(cellX(mid) + 4);
-                floatY = (int16_t)(cellY(mid) - 4);
-                floatT = 50;
-                if (l.n == wd::RACK) {
-                    fx::banner("BINGO!", fx::B_RAINBOW, 40, 90);
-                    fx::fountain(40, 100, 18);
-                    fx::fountain(88, 100, 18);
-                    audio::sfx(Sfx::Doubles);
-                    audio::led(audio::LED_PARTY);
-                } else if (l.score >= 30) {
-                    for (uint8_t i = 0; i < l.n; i++) sparkle(l.cell[i], fx::STAR, 4, GOLD);
-                    audio::sfx(Sfx::Pickup);
-                    audio::led(audio::LED_BLINK);
-                } else {
-                    sparkle(mid, fx::SPARK, 8, GOLD);
-                    audio::sfx(Sfx::Coin);
-                }
+            if (++animT >= l.main.len * 4 + 6) {
+                payout();
+                anim = A_FLOAT;
             }
-            anim = A_FLOAT;
-            animT = 0;
             break;
-        case A_FLOAT:
-            if (!floatT && !fx::bannerActive() && shown[0] == game::score[0] && shown[1] == game::score[1]) anim = A_NONE;
+        case A_FLOAT: {
+            bool floating = false;
+            for (auto &f : floats) floating |= f.t != 0;
+            if (!floating && !fx::bannerActive() && shown[0] == game::score[0] && shown[1] == game::score[1]) anim = A_NONE;
             break;
+        }
         case A_NOTE:
             if (!noteT) anim = A_NONE;
             break;
@@ -225,14 +331,85 @@ void update() {
 // Drawing
 // ---------------------------------------------------------------------------
 static const uint8_t RM_ID[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-static const uint8_t PREMIUM_COL[5] = {FELT, CYAN, BLUE, WINE, RED};
 
-// A tile on the board: 7 x 7 with a shaded edge, its letter in the 3x5 font.
-static void boardTile(int x, int y, uint8_t v, uint8_t face) {
-    gfx_fillRect(x, y, 6, 6, face);
-    gfx_hline(x, y + 6, 7, WOOD);
-    gfx_vline(x + 6, y, 6, WOOD);
-    glyph(x + 1, y, FONT35['A' + (v & wd::LETTER) - 1 - FONT35_FIRST], 3, (v & wd::BLANK) ? RED : INK);
+// The premium squares are set into the board, dark against the felt; the
+// tiles stand up off it, light. Letter premiums blue, word premiums red,
+// each with what it does on it.
+static const uint8_t PREMIUM_COL[5] = {FELT, BLUE, NAVY, WINE, RED};
+static const uint8_t PREMIUM_INK[5] = {0, CYAN, CYAN, SKIN, WHITE};
+static const char *const PREMIUM_TEXT[5] = {"", "DL", "TL", "DW", "TW"};
+
+// M and W five columns wide in the small letters: in three they are an H
+// with its bar a row out of place.
+static const uint8_t WIDE_M[5] = {0x1F, 0x02, 0x04, 0x02, 0x1F};
+static const uint8_t WIDE_W[5] = {0x1F, 0x08, 0x04, 0x08, 0x1F};
+static const uint8_t STAR[5] = {0x04, 0x1E, 0x0F, 0x1E, 0x04};
+
+// A column glyph at twice the size.
+static void glyph2(int x, int y, const uint8_t *cols, uint8_t n, uint8_t c) {
+    for (uint8_t i = 0; i < n; i++)
+        for (uint8_t r = 0; r < 8; r++)
+            if (cols[i] >> r & 1) gfx_fillRect(x + 2 * i, y + 2 * r, 2, 2, c);
+}
+
+static uint8_t shadeOf(uint8_t face) {
+    switch (face) {
+        case WHITE: return SILVER;
+        case FX_B:  return GOLD;
+        case RED:   return WINE;
+        case CYAN:  return BLUE;
+        default:    return WOOD;
+    }
+}
+
+// A tile on the board, its square's corner at (x, y), squares p apart.
+// lift: on its way down (it casts its shadow where it will land, and looms
+// larger the higher it is).
+static void boardTile(int x, int y, int p, uint8_t v, uint8_t face, uint8_t ink, int lift) {
+    int t = p >= 14 ? 2 : 1, f = p - 1 - t;
+    uint8_t r = p >= 12 ? 1 : 0;
+    if (lift) {
+        fillRound(x + t, y + t, f, f, r, FELT_DK);
+        int g = lift / 4;
+        x -= g;
+        y -= lift + g;
+        f += 2 * g;
+    }
+    fillRound(x + t, y + t, f, f, r, WOOD);         // its thickness
+    fillRound(x, y, f, f, r, face);
+    uint8_t l = v & wd::LETTER;
+    if (p >= 12) {
+        uint8_t sh = shadeOf(face);
+        gfx_hline(x + 1, y + f - 1, f - 2, sh);
+        gfx_vline(x + f - 1, y + 1, f - 2, sh);
+    }
+    if (p >= 14) tileLetter(x, y + (f - 9) / 2, f, l, ink);
+    else if (l == 13 || l == 23) glyph(x + (f - 5) / 2, y + (f - 5) / 2, l == 13 ? WIDE_M : WIDE_W, 5, ink);
+    else glyph(x + (f - 3) / 2, y + (f - 5) / 2, FONT35['A' + l - 1 - FONT35_FIRST], 3, ink);
+}
+
+// A square with no tile: the felt, or a premium square set into it.
+static void square(int x, int y, uint8_t cell) {
+    uint8_t pr = wd::premium(cell), s = (uint8_t)(zs - 1);
+    if (!pr) {
+        // A plain square: a dimple, so the board reads as squares without
+        // ruling it into a carpet.
+        if (zs >= 12) {
+            gfx_hline(x + 1, y, s - 2, FELT_DK);
+            gfx_vline(x, y + 1, s - 2, FELT_DK);
+        } else gfx_pixel(x + s / 2, y + s / 2, FELT_DK);
+        return;
+    }
+    fillRound(x, y, s, s, zs >= 12 ? 2 : 0, PREMIUM_COL[pr]);
+    if (cell == wd::CENTRE) {
+        if (zs >= 12) glyph2(x + (s - 10) / 2, y + (s - 10) / 2, STAR, 5, GOLD);
+        else glyph(x + 1, y + 1, STAR, 5, GOLD);
+    } else if (zs >= 12) {
+        text35(x + (s - 7) / 2, y + (s - 5) / 2, PREMIUM_TEXT[pr], PREMIUM_INK[pr]);
+    } else {
+        // Far off: just how many times over.
+        glyph(x + (s - 3) / 2, y + (s - 5) / 2, FONT35[(pr & 1 ? '2' : '3') - FONT35_FIRST], 3, PREMIUM_INK[pr]);
+    }
 }
 
 static bool inSpan(const wd::Span &s, uint8_t cell, uint8_t upTo) {
@@ -240,95 +417,100 @@ static bool inSpan(const wd::Span &s, uint8_t cell, uint8_t upTo) {
     return false;
 }
 
-// play: the game's view (the HUD and the rack go over its edges). Else the
-// whole board, top to bottom: the title's backdrop.
 static void drawBoard(bool play) {
-    int y0 = play ? BY - 7 : 0, y1 = play ? BY + VIEW_H + 7 : 128;
-    gfx_fillRect(BX, y0, 120, y1 - y0, FELT);
-    for (int c = 0; c < SIZE; c++) gfx_vline(BX + c * CELL + 7, y0, y1 - y0, FELT_DK);
-    gfx_fillRect(0, y0, BX, y1 - y0, WOOD);
-    gfx_fillRect(BX + 120, y0, 4, y1 - y0, WOOD);
-    gfx_vline(BX - 1, y0, y1 - y0, GOLD);
-    gfx_vline(BX + 120, y0, y1 - y0, GOLD);
+    int size = SIZE * zs, x0 = -camX, y0 = -camY;
+    // The table, the board's wooden frame on it, the felt in the frame.
+    gfx_fillRect(0, HUD_H, 128, 128 - HUD_H, FELT_DK);
+    dither(0, HUD_H, 128, 128 - HUD_H, INK, 0);
+    fillRound(x0 - FRAME + 1, y0 - FRAME + 1, size + 2 * FRAME, size + 2 * FRAME, 3, INK);     // its shadow
+    fillRound(x0 - FRAME, y0 - FRAME, size + 2 * FRAME, size + 2 * FRAME, 3, WOOD);
+    gfx_rect(x0 - 1, y0 - 1, size + 2, size + 2, GOLD);
+    gfx_fillRect(x0, y0, size, size, FELT);
     const game::Last &l = game::last;
     bool lastPlay = play && l.kind == game::PLAYED;
-    for (uint8_t row = (uint8_t)(scrollY / CELL); row < SIZE; row++) {
-        int y = BY + row * CELL - scrollY;
-        if (y >= (play ? BY + VIEW_H : 128)) break;
-        gfx_hline(BX, y + 7, 120, FELT_DK);
-        for (uint8_t col = 0; col < SIZE; col++) {
-            uint8_t cell = (uint8_t)(row * SIZE + col), v = game::board[cell];
-            int x = BX + col * CELL;
-            uint8_t face = SKIN;
-            int lift = 0;
-            if (lastPlay && v) {
-                for (uint8_t i = 0; i < l.n; i++) {
-                    if (l.cell[i] != cell) continue;
-                    if (i > dropped) v = 0;                                     // not down yet
-                    else if (i == dropped && anim == A_DROP) lift = 6 - animT;  // on its way
-                    face = GOLD;                                                // the last play stays marked
+    int r0 = (camY + HUD_H) / zs, r1 = (camY + 127) / zs, c0 = camX / zs, c1 = (camX + 127) / zs;
+    if (r0 < 0) r0 = 0;
+    if (c0 < 0) c0 = 0;
+    if (r1 > SIZE - 1) r1 = SIZE - 1;
+    if (c1 > SIZE - 1) c1 = SIZE - 1;
+    // The squares, then the tiles over them (a lifted tile overlaps the row above).
+    for (int pass = 0; pass < 2; pass++)
+        for (int row = r0; row <= r1; row++)
+            for (int col = c0; col <= c1; col++) {
+                uint8_t cell = (uint8_t)(row * SIZE + col), v = game::board[cell];
+                int x = col * zs - camX, y = row * zs - camY;
+                uint8_t face = WHITE, ink = INK;
+                int lift = 0;
+                if (lastPlay && v) {
+                    for (uint8_t i = 0; i < l.n; i++) {
+                        if (l.cell[i] != cell) continue;
+                        if (i > dropped) v = 0;                                         // not down yet
+                        else if (i == dropped && anim == A_DROP) lift = 2 * (8 - animT) * (8 - animT) / 4;
+                        face = GOLD;                                                    // the last play stays marked
+                    }
+                    if (anim == A_SWEEP && inSpan(l.main, cell, (uint8_t)(animT / 4 + 1))) {
+                        face = FX_B;
+                        if (inSpan(l.main, cell, (uint8_t)(animT / 4 + 1)) && !inSpan(l.main, cell, (uint8_t)(animT / 4))) lift = 2;
+                    }
                 }
-                if (anim == A_SWEEP && inSpan(l.main, cell, (uint8_t)(animT / 3 + 1))) face = FX_B;
+                if (play) for (uint8_t i = 0; i < tent.n; i++)
+                    if (tent.p[i].cell == cell) {
+                        v = tent.p[i].tile;
+                        face = SKIN;
+                        lift = cell == slamCell && slamT ? slamT * slamT / 2 : 1;      // laid out, not yet played: held up
+                    }
+                if (v && (v & wd::BLANK)) ink = RED;
+                if (denyT && (denyT & 4) && (denyWord ? inSpan(denySpan, cell, 15) : face == SKIN)) { face = RED; ink = WHITE; }
+                if (pass == 0) { if (!v || lift) square(x, y, cell); }
+                else if (v) boardTile(x, y, zs, v, face, ink, lift);
             }
-            if (play) for (uint8_t i = 0; i < tent.n; i++)
-                if (tent.p[i].cell == cell) { v = tent.p[i].tile; face = WHITE; }
-            if (denyT && (denyT & 4) && (denyWord ? inSpan(denySpan, cell, 15) : face == WHITE)) face = RED;
-            if (!v || lift) {
-                uint8_t pr = wd::premium(cell);
-                if (pr) gfx_fillRect(x, y, 7, 7, PREMIUM_COL[pr]);
-                if (cell == wd::CENTRE) glyph(x + 2, y + 1, FONT35['*' - FONT35_FIRST], 3, GOLD);
-            }
-            if (v) boardTile(x, y - lift, v, face);
-        }
-    }
 }
 
-void renderBoard() {
-    scrollY = scrollTo = 8;             // (the top row is under the title's sign)
-    drawBoard(false);
-}
-
-// A tile in the rack: its letter twice the size, its value in the corner.
+// A tile in the rack: taller than wide, its letter in the serif face, its
+// value in the corner.
 static void rackTile(int x, int y, uint8_t t, uint8_t face) {
-    gfx_fillRect(x, y, TILE_W - 1, TILE_H - 1, face);
-    gfx_hline(x, y + TILE_H - 1, TILE_W, WOOD);
-    gfx_vline(x + TILE_W - 1, y, TILE_H - 1, WOOD);
+    fillRound(x + 2, y + 2, 13, 17, 1, WOOD);
+    fillRound(x, y, 13, 17, 1, face);
+    gfx_hline(x + 1, y + 16, 11, shadeOf(face));
+    gfx_vline(x + 12, y + 1, 15, shadeOf(face));
     if (t == wd::BLANK_TILE) return;
-    char s[3] = {(char)('A' + t - 1), 0, 0};
-    text35x2(x + 1, y + 1, s, INK);
+    tileLetter(x, y + 2, 13, t, INK);
+    char s[3];
     uint8_t val = wd::VALUE[t];
     fmtInt(s, val);
     text35(x + (val >= 10 ? 4 : 8), y + 11, s, WOOD);
 }
 
 static void drawRack(uint32_t frame) {
-    gfx_fillRect(0, 106, 128, 22, INK);
-    gfx_hline(0, 105, 128, GOLD);
+    int top = rackTop();
+    if (top >= 128) return;
+    gfx_fillRect(0, top, 128, RACK_H, INK);
+    gfx_hline(0, top, 128, GOLD);
     bool mine = !game::cpuTurn() && !game::over;
     for (uint8_t i = 0; i < wd::RACK; i++) {
         uint8_t t = game::rack[viewSide][i];
-        int x = RACK_X + i * TILE_PITCH, y = RACK_Y;
-        if (!t || !slotFree(i)) { gfx_rect(x + 2, y + 3, TILE_W - 4, TILE_H - 6, NAVY); continue; }     // an empty slot
-        uint8_t face = SKIN;
+        int x = i * TILE_PITCH, y = top + 3;
+        if (!t || !slotFree(i)) { roundRect(x + 2, y + 2, 11, 15, 2, NAVY); continue; }     // an empty slot
+        uint8_t face = WHITE;
         bool sel = mine && (mode == RACK || mode == SWAP) && i == rackSel;
         if (mode == SWAP && (swapMarks >> i & 1)) { y -= 2; face = CYAN; }
-        if (sel) y -= 1;
+        if (sel) y -= 2;
         rackTile(x, y, t, face);
-        if (sel) gfx_rect(x - 1, y - 1, TILE_W + 2, TILE_H + 2, (frame & 16) ? FX_B : WHITE);
+        if (sel) roundRect(x - 1, y - 1, 15, 19, 1, (frame & 16) ? FX_B : GOLD);
     }
     // Beside the rack: what the laid-out tiles would score, and the way the word runs.
     char buf[8];
     if (tent.n) {
         if (tentScore >= 0) { buf[0] = '+'; fmtInt(buf + 1, tentScore); }
         else fmtStr(buf, "--");
-        text35(109, 109, buf, tentScore >= 0 ? FX_B : RED);
+        text35(127 - text35Width(buf), top + 4, buf, tentScore >= 0 ? FX_B : RED);
     }
-    if (mine && mode != SWAP) text35(109, 118, down ? "DOWN" : "RIGHT", FELT_LT);
+    if (mine && mode != SWAP) glyph2(115, top + 11, FONT35[(down ? 'V' : '>') - FONT35_FIRST], 3, FELT_LT);
 }
 
 static void drawHud() {
-    gfx_fillRect(0, 0, 128, 8, INK);
-    gfx_hline(0, 8, 128, GOLD);
+    gfx_fillRect(0, 0, 128, HUD_H, INK);
+    gfx_hline(0, HUD_H - 1, 128, GOLD);
     char buf[16], *p;
     bool cpu = game::setup.mode == game::VS_CPU;
     for (uint8_t s = 0; s < 2; s++) {
@@ -351,27 +533,57 @@ static void plate(const char *s, uint8_t c, int y) {
 static void drawCursor(uint32_t frame) {
     if (game::cpuTurn() || game::over || anim != A_NONE || mode == SWAP) return;
     int x = cellX(cursor), y = cellY(cursor);
-    gfx_rect(x - 1, y - 1, 9, 9, (frame & 16) ? FX_B : WHITE);
+    uint8_t c = (frame & 16) ? FX_B : WHITE;
+    gfx_rect(x - 1, y - 1, zs + 1, zs + 1, c);
+    if (zs >= 12) gfx_rect(x - 2, y - 2, zs + 3, zs + 3, INK);
     if (mode == RACK || mode == PICK) {
         // Where the next tile goes, and which way the word runs from it.
-        if (!game::board[cursor]) glyph(x + 2, y + 1, FONT35[(down ? 'V' : '>') - FONT35_FIRST], 3, FX_B);
+        if (!game::board[cursor]) {
+            const uint8_t *g = FONT35[(down ? 'V' : '>') - FONT35_FIRST];
+            if (zs >= 12) { gfx_fillRect(x + 1, y + 1, zs - 3, zs - 3, INK); glyph2(x + zs / 2 - 3, y + zs / 2 - 5, g, 3, FX_B); }
+            else glyph(x + 2, y + 1, g, 3, FX_B);
+        }
         // The glove, over the chosen tile (unless it would hide the square).
-        if (mode == RACK && y < 84) {
+        int top = rackTop();
+        if (mode == RACK && y + zs < top - 18) {
             int bob = (frame >> 4) & 1;
-            sprite4(HAND, RACK_X + rackSel * TILE_PITCH + TILE_W / 2 - HAND_TIP, RACK_Y - 18 - bob, RM_ID);
+            sprite4(HAND, rackSel * TILE_PITCH + 6 - HAND_TIP, top - 15 - bob, RM_ID);
         }
     }
 }
 
 static void drawPicker(uint32_t frame) {
-    fillRound(11, 30, 106, 62, 3, NAVY);
-    roundRect(11, 30, 106, 62, 3, GOLD);
-    text35(64 - text35Width("THE BLANK IS...") / 2, 34, "THE BLANK IS...", GOLD);
+    fillRound(11, 26, 106, 66, 3, NAVY);
+    roundRect(11, 26, 106, 66, 3, GOLD);
+    text35(64 - text35Width("THE BLANK IS...") / 2, 30, "THE BLANK IS...", GOLD);
     for (uint8_t i = 0; i < 26; i++) {
-        int x = 16 + (i % 7) * 14, y = 43 + (i / 7) * 12;
-        char s[2] = {(char)('A' + i), 0};
-        if (i == pickSel) gfx_fillRect(x - 2, y - 1, 11, 12, (frame & 16) ? FX_B : GOLD);
-        text35x2(x, y, s, i == pickSel ? INK : WHITE);
+        int x = 15 + (i % 7) * 14, y = 39 + (i / 7) * 13;
+        if (i == pickSel) fillRound(x, y, 13, 13, 1, (frame & 16) ? FX_B : GOLD);
+        tileLetter(x, y + 2, 13, (uint8_t)(i + 1), i == pickSel ? INK : WHITE);
+    }
+}
+
+// The floats: the score in the display face, gold with an outline; the rest small.
+static void drawFloats() {
+    for (auto &f : floats) {
+        if (!f.t || (f.t < 8 && !(f.t & 1))) continue;
+        if (f.text[0] == '+') {
+            int w = fontWidth(f.text), x = f.x - w / 2, y = f.y - FONT_H;
+            if (x < 2) x = 2;
+            if (x > 125 - w) x = 125 - w;
+            if (y < HUD_H + 2) y = HUD_H + 2;
+            Mask m = maskBegin(w, FONT_H);
+            maskFont(m, 0, 0, f.text);
+            uint8_t ramp[FONT_H + 2];
+            for (int i = 0; i < FONT_H + 2; i++) ramp[i] = i < 4 ? FX_B : (i < 9 ? GOLD : WOOD);
+            maskDraw(m, x, y, INK, INK, ramp);
+        } else {
+            int w = text35Width(f.text), x = f.x - w / 2;
+            if (x < 2) x = 2;
+            if (x > 126 - w) x = 126 - w;
+            fillRound(x - 2, f.y - 2, w + 3, 9, 2, INK);
+            text35(x, f.y, f.text, f.colour);
+        }
     }
 }
 
@@ -382,7 +594,7 @@ static bool wasMoving;
 
 bool render(uint32_t frame, uint32_t ui) {
     int lo, hi;
-    bool moving = fx::activeRows(lo, hi) || anim != A_NONE || denyT;
+    bool moving = fx::activeRows(lo, hi) || anim != A_NONE || denyT || slamT;
     if (wasMoving && !moving) dirty = true;         // once more, to clear up after it
     wasMoving = moving;
     // Still: the blinks step every 16 frames, and the palette does the rest.
@@ -394,27 +606,31 @@ bool render(uint32_t frame, uint32_t ui) {
     dirty = false;
     drawBoard(true);
     drawCursor(frame);
-    fx::drawParticles(2);
-    if (floatT) {
-        int y = floatY - (50 - floatT) / 3, x = floatX - text35x2Width(floatText) / 2;
-        if (x < 2) x = 2;
-        if (x > 126 - text35x2Width(floatText)) x = 126 - text35x2Width(floatText);
-        if (y < 12) y = 12;
-        if (floatT > 6 || (floatT & 1)) {
-            text35x2(x + 1, y + 1, floatText, INK);
-            text35x2(x, y, floatText, FX_B);
-        }
-    }
+    fx::drawParticles(zs >= 12 ? 3 : 2);
+    drawFloats();
     drawHud();
     drawRack(frame);
+    int py = rackTop() - 15;
     if (cpuThinking) {
-        plate(cpuThinking, SILVER, 90);
-        gfx_hline(36, 99, (ai::progress() * 56) >> 8, FX_B);
-    } else if (noteT) plate(noteText, noteCol, 90);
+        plate(cpuThinking, SILVER, py);
+        gfx_hline(36, py + 9, (ai::progress() * 56) >> 8, FX_B);
+    } else if (noteT) plate(noteText, noteCol, py);
     if (mode == PICK) drawPicker(frame);
     fx::drawBanner();
-    fx::applyShake(9, 104);
+    fx::applyShake(HUD_H, rackTop() - 1);
     return true;
+}
+
+void renderTitle(uint32_t frame) {
+    // Close up, drifting over the words laid out on it: a slow figure of eight.
+    title = true;
+    zs = NEAR;
+    rackT = 0;
+    int a = (int)(frame / 3);
+    camX = 40 + ((fx::isin(a) * 36) >> 8);
+    camY = 36 + ((fx::isin(a * 2) * 22) >> 8);
+    game::last.kind = game::NOTHING;
+    drawBoard(false);
 }
 
 }  // namespace stage

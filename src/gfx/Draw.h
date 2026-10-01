@@ -30,6 +30,10 @@ void dither(int x, int y, int w, int h, uint8_t c, uint8_t phase);      // 50% c
 // Column-major 1 bpp glyph (bit 0 = top row, <= 8 rows), from SRAM.
 void glyph(int x, int y, const uint8_t *cols, uint8_t ncols, uint8_t c);
 
+// A letter (1..26) in the tiles' serif face (Assets TILEFONT, 9 rows from
+// its top to the baseline), centred in w pixels from x.
+void tileLetter(int x, int y, int w, uint8_t letter, uint8_t c);
+
 // PPOT's 3x5 font: 4 px advance, '~' = 2 px space, newline = 7 px down.
 int  text35(int x, int y, const char *str, uint8_t c);
 int  text35Width(const char *str);
