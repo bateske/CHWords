@@ -38,5 +38,7 @@ uint32_t count();                   // words in the list in use
 // The card's list while it answers, else the flash list. A card that stops
 // answering is dropped (card() goes false) until begin() finds it again.
 bool has(const uint8_t *w, uint8_t n);
+// A word off the card, picked by r, as capitals into out (16 bytes). False: no card.
+bool randomWord(char *out, uint32_t r);
 
 }  // namespace dict

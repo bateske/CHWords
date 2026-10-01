@@ -95,4 +95,22 @@ bool has(const uint8_t *w, uint8_t n) {
     return false;
 }
 
+bool randomWord(char *out, uint32_t r) {
+    for (uint8_t tries = 0; live && tries < 8; tries++, r = r * 1664525u + 1013904223u) {
+        const uint8_t *p = block(1 + ((r >> 8) & mask));
+        if (!p) { live = false; break; }
+        uint8_t n = 0;
+        for (uint16_t i = 0; i < 510 && p[i]; i++) n += p[i] >> 7;     // words in the bucket
+        if (!n) continue;
+        uint8_t k = (uint8_t)(r % n), len = 0;
+        for (uint16_t i = 0; i < 510 && p[i]; i++) {
+            if (!k && len < 15) out[len++] = (char)('A' - 1 + (p[i] & 0x7F));
+            if ((p[i] & 0x80) && !k--) break;
+        }
+        out[len] = 0;
+        return true;
+    }
+    return false;
+}
+
 }  // namespace dict

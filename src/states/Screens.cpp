@@ -702,6 +702,7 @@ static void playRender(uint32_t frame) {
 enum Opt : uint8_t { O_SOUND, O_FELT, O_WORDS, O_BACK, OPT_COUNT };
 static const char *const OPT_TEXT[OPT_COUNT] = {"SOUND|OFF|ON", "FELT|GREEN|BLUE|RED|PURPLE", "WORDS", "BACK"};
 static bool wordsInfo;               // the panel on the word lists is up
+static char randomWord[16];          // ... and a word off the card for it
 static uint8_t &optByte(uint8_t i) { return ((uint8_t *)&opt)[i]; }
 
 static uint8_t optField(const char *s, uint8_t k, char *buf) {
@@ -725,6 +726,7 @@ static void optionsUpdate() {
         gfx_wait();
         dict::begin();               // a card put in since?
         wordsInfo = true;
+        if (!dict::randomWord(randomWord, fx::rnd() ^ micros())) randomWord[0] = 0;
         audio::sfx(Sfx::Select);
         return;
     }
@@ -751,19 +753,19 @@ static void optionsRender(uint32_t frame) {
     feltBackdrop();
     heading("OPTIONS", 8);
     for (uint8_t i = 0; i < OPT_COUNT; i++) {
-        int y = 32 + i * 16;
+        int y = 30 + i * 18;
         char label[12], value[12];
         optField(OPT_TEXT[i], 0, label);
-        if (i == sel && !wordsInfo) {
-            fillRound(8, y - 3, 112, 15, 3, NAVY);
-            roundRect(8, y - 3, 112, 15, 3, (frame & 16) ? FX_B : GOLD);
+        if (i == sel && !wordsInfo) {               // two clear pixels or more round the lettering
+            fillRound(8, y - 4, 112, 18, 3, NAVY);
+            roundRect(8, y - 4, 112, 18, 3, (frame & 16) ? FX_B : GOLD);
         }
         if (i >= O_WORDS) { centred2(y, label, i == sel ? GOLD : WHITE); continue; }
         fontText(13, y, label, i == sel ? GOLD : WHITE);
         optField(OPT_TEXT[i], (uint8_t)(optByte(i) + 1), value);
         fontText(115 - fontWidth(value, 0), y, value, i == sel ? WHITE : FELT_LT, 0);
     }
-    centred35(97, "SELECT IN A GAME: A HINT", FELT_LT);
+    centred35(101, "SELECT IN A GAME: A HINT", FELT_LT);
     if (wordsInfo) {
         // How many words, and how to get the rest.
         panel(18, 92);
@@ -772,15 +774,20 @@ static void optionsRender(uint32_t frame) {
         fmtStr(fmtInt(fmtStr(buf, "BUILT IN: "), DICT_WORDS), " WORDS");
         centred35(40, buf, WHITE);
         if (dict::card()) {
-            fmtStr(fmtInt(fmtStr(buf, "ON THE CARD: "), (int32_t)dict::count()), " WORDS");
-            centred35(50, buf, CYAN);
-            centred35(66, "THE CARD'S LIST IS IN USE.", SILVER);
+            fmtStr(fmtInt(buf, (int32_t)dict::count()), " WORDS ON CARD");
+            centred35(52, buf, FELT_LT);
+            centred35(68, "RANDOM WORD:", SILVER);
+            // In the rainbow, a letter a colour, the colours running along it.
+            int x = 64 - (int)strlen(randomWord) * 4;
+            for (uint8_t i = 0; randomWord[i]; i++, x += 8) {
+                char one[2] = {randomWord[i], 0};
+                text35x2(x, 78, one, fx::RAIN[(i + (frame >> 3)) % 5]);
+            }
         } else {
-            centred35(50, "WITH THE SD CARD: 168551", CYAN);
-            centred35(62, "PUT THE FILE  WORDS.DIC", SILVER);
-            centred35(70, "IN THE TOP FOLDER OF A", SILVER);
-            centred35(78, "FAT32 SD CARD, PUT THE", SILVER);
-            centred35(86, "CARD IN, AND SWITCH ON.", SILVER);
+            centred35(52, "168551 WORDS MISSING", RED);
+            centred35(66, "PLACE FILE WORDS.DIC IN", SILVER);
+            centred35(74, "ROOT FOLDER OF FAT32", SILVER);
+            centred35(82, "SD CARD", SILVER);
         }
         centred35(100, "A OR B: BACK", GOLD);
     }
