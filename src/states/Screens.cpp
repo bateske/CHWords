@@ -726,7 +726,9 @@ static void optionsUpdate() {
         gfx_wait();
         dict::begin();               // a card put in since?
         wordsInfo = true;
-        if (!dict::randomWord(randomWord, fx::rnd() ^ micros())) randomWord[0] = 0;
+        // One that fits the panel in the display face.
+        for (uint8_t k = 0; k < 12; k++)
+            if (!dict::randomWord(randomWord, fx::rnd() ^ micros()) || fontWidth(randomWord, 0) <= 104) break;
         audio::sfx(Sfx::Select);
         return;
     }
@@ -760,10 +762,13 @@ static void optionsRender(uint32_t frame) {
             fillRound(8, y - 4, 112, 18, 3, NAVY);
             roundRect(8, y - 4, 112, 18, 3, (frame & 16) ? FX_B : GOLD);
         }
-        if (i >= O_WORDS) { centred2(y, label, i == sel ? GOLD : WHITE); continue; }
-        fontText(13, y, label, i == sel ? GOLD : WHITE);
+        // In the tiles' anti-aliased serif.
+        bool on = i == sel && !wordsInfo;
+        uint8_t ink = on ? GOLD : WHITE, mid = on ? WOOD : FELT_LT;
+        if (i >= O_WORDS) { tileText(64 - tileText(0, 0, label, 0, 0, 0, false) / 2, y + 1, label, ink, mid, INK); continue; }
+        tileText(14, y + 1, label, ink, mid, INK);
         optField(OPT_TEXT[i], (uint8_t)(optByte(i) + 1), value);
-        fontText(115 - fontWidth(value, 0), y, value, i == sel ? WHITE : FELT_LT, 0);
+        tileText(114 - tileText(0, 0, value, 0, 0, 0, false), y + 1, value, on ? WHITE : FELT_LT, on ? SILVER : FELT, INK);
     }
     centred35(101, "SELECT IN A GAME: A HINT", FELT_LT);
     if (wordsInfo) {
@@ -776,13 +781,18 @@ static void optionsRender(uint32_t frame) {
         if (dict::card()) {
             fmtStr(fmtInt(buf, (int32_t)dict::count()), " WORDS ON CARD");
             centred35(52, buf, FELT_LT);
-            centred35(68, "RANDOM WORD:", SILVER);
-            // In the rainbow, a letter a colour, the colours running along it.
-            int x = 64 - (int)strlen(randomWord) * 4;
-            for (uint8_t i = 0; randomWord[i]; i++, x += 8) {
-                char one[2] = {randomWord[i], 0};
-                text35x2(x, 78, one, fx::RAIN[(i + (frame >> 3)) % 5]);
-            }
+            centred35(66, "RANDOM WORD:", SILVER);
+            // As the banners say BINGO!: the display face in the rainbow,
+            // the letters dancing.
+            uint8_t gap = fontWidth(randomWord) > 100 ? 0 : 1;
+            int w = fontWidth(randomWord, gap), t = (int)frame;
+            int8_t dy[16];
+            for (uint8_t k = 0; k < 16; k++) dy[k] = (int8_t)(2 + ((fx::isin(t * 10 + k * 36) * 2) >> 8));
+            Mask m = maskBegin(w + 1, FONT_H + 6);
+            maskFont(m, 0, 0, randomWord, dy, gap);
+            uint8_t ramp[FONT_H + 6];
+            for (int r = 0; r < FONT_H + 6; r++) ramp[r] = fx::RAIN[(((r + 8) / 2) + t / 3) % 5];
+            maskDraw(m, 64 - w / 2, 74, FX_A, INK, ramp);
         } else {
             centred35(52, "168551 WORDS MISSING", RED);
             centred35(66, "PLACE FILE WORDS.DIC IN", SILVER);

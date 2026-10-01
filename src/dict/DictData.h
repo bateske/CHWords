@@ -2,8 +2,8 @@
 #pragma once
 #include <stdint.h>
 
-constexpr uint16_t DICT_WORDS = 15088;       // words in the flash list
-constexpr uint16_t DICT_ENTRIES = 4794;      // base words (the rest are made from them by the rules)
+constexpr uint16_t DICT_WORDS = 14161;       // words in the flash list
+constexpr uint16_t DICT_ENTRIES = 4536;      // base words (the rest are made from them by the rules)
 constexpr uint8_t DICT_BLOCK = 32;
 // A rule makes a word from a base word: `strip` (a letter 1..26 the base
 // must end with, or 0) comes off, `twice` repeats the last letter, `add`
@@ -13,8 +13,8 @@ constexpr uint8_t DICT_RULES = 24;
 extern const DictRule DICT_RULE[DICT_RULES];
 typedef uint32_t dictmask_t;                    // bit i: rule i makes a word
 constexpr uint8_t DICT_TERM_BYTES = 3;
-extern const uint8_t DICT_TERM[213];         // terminator symbol - 26 -> its rule set, little-endian
+extern const uint8_t DICT_TERM[207];         // terminator symbol - 26 -> its rule set, little-endian
 extern const uint16_t DICT_HUFF_AT[28];         // each context's table in DICT_HUFF
-extern const uint8_t DICT_HUFF[1191];
-extern const uint16_t DICT_INDEX[150];         // each block's byte in DICT_BITS
-extern const uint8_t DICT_BITS[9592];
+extern const uint8_t DICT_HUFF[1177];
+extern const uint16_t DICT_INDEX[142];         // each block's byte in DICT_BITS
+extern const uint8_t DICT_BITS[8987];

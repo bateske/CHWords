@@ -13,7 +13,7 @@ float of gold; TRIPLE! shakes the table and BINGO! goes off in the rainbow
 for all seven tiles. Three CPU opponents, two players passing the handheld
 behind a curtain, and a hint when you are stuck.
 
-The point of it is the dictionary. **15,088 words live in the game itself**,
+The point of it is the dictionary. **14,161 words live in the game itself**,
 in 12.4 KB of a 50 KB program, so it plays with nothing in the card slot;
 put the file `WORDS.DIC` on a microSD card and your words are checked
 against **all 168,551 words** of the ENABLE list (2 to 15 letters) instead.
@@ -56,7 +56,7 @@ saved game. From the command line:
 `out/WORDS.DIC` (4 MB). Copy it to the root folder of a microSD card
 formatted FAT16 or FAT32 (not exFAT) and put the card in before switching
 on. The title screen says which list is in play: "168551 WORDS ON THE CARD"
-or "15088 WORDS  NO CARD".
+or "14161 WORDS  NO CARD".
 
 ## Playing
 
@@ -100,7 +100,7 @@ the chess set, and held up off the board; the last play made stays gold
 until the next.
 
 **Which words count.** With the card in, any ENABLE word. Without it, the
-15,088 in the game: every two- and three-letter word, the most common
+14,161 in the game: every two- and three-letter word, the most common
 longer ones (up to eight letters), and the words that plain endings make
 from those (walk, walks, walked, walking, walker, walkers). The CPU only
 ever plays words from the built-in list, so it never plays a word the card
@@ -123,7 +123,7 @@ against each opponent, your best game and your best single play are on the
 opponent screen (hold SELECT there to clear the record). Options: sound,
 the felt (green, blue, red, purple), and WORDS: how many words are built
 in, and what to put on a card for the rest (with a card in: a random word
-off it). Options, records and a game in progress
+off it, dancing in the rainbow). Options, records and a game in progress
 (SAVE+QUIT, then CONTINUE) are saved to flash and survive re-uploading.
 
 ## How it fits
@@ -134,7 +134,7 @@ off it). Options, records and a game in progress
   * *Folding.* A word that a rule makes from another ("add S", "add ED",
     "drop the E and add ING", "change the Y to IES": 24 rules) is not
     stored; the base word carries the set of rules that make words from it.
-    15,088 words are 4,794 entries.
+    14,161 words are 4,536 entries.
   * *Front coding.* The entries are sorted, and each stores only the count
     of letters it shares with the one before, then the rest.
   * *Huffman coding by context.* Every symbol is Huffman coded with a table
@@ -158,12 +158,14 @@ off it). Options, records and a game in progress
   SPI between frames and hands it back as it found it.
 * **The tiles are drawn, not stored**: rounded rectangles in two colours
   (the face and its thickness) and a letter - close up and in the rack in a
-  serif face (DejaVu Serif Bold, 297 bytes for all 26), far off in the 3x5
+  serif face anti-aliased with one in-between tone, as in CHCrossword
+  (DejaVu Serif Bold, 546 bytes for all 26; the options menu uses it too),
+  far off in the 3x5
   font. The board is drawn at any square size from 8 to 16 pixels, which is
   what lets the camera whip between them. The only stored art is the glove
   (CHChess's), the arrow for the way a word runs and the display font.
-* **Flash** (release build): 50,428 of 50,944 bytes, of which the dictionary
-  is 11,544. The camera, the raised tiles and the serif letters cost about
+* **Flash** (release build): 50,432 of 50,944 bytes, of which the dictionary
+  is 10,903. The camera, the raised tiles and the serif letters cost about
   3 KB, which is about 4,000 words of the built-in list; with a card in it
   makes no difference. **RAM**: 15.7 KB of 18.4 KB static, of which 8 KB is
   the framebuffer.
@@ -174,7 +176,7 @@ off it). Options, records and a game in progress
     python tools/tests/run_tests.py  # the host tests alone
     python tools/chsim/chdrive.py --sim . tools/scripts/ui.txt out/ui    # one script: screenshots in out/ui
     python tools/chsim/chdrive.py --sim . tools/scripts/gameplay.txt out/gameplay   # the reel at the top (showcase.txt: the rest)
-    python tools/dict/build_dict.py --bytes 11546    # rebuild the built-in list to a flash budget
+    python tools/dict/build_dict.py --bytes 10904    # rebuild the built-in list to a flash budget
     python tools/dict/build_sd.py    # out/WORDS.DIC, checked word by word
     python tools/assets.py           # the glove, the arrow, the fonts -> src/assets
 

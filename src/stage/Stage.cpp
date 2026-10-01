@@ -385,7 +385,7 @@ static void boardTile(int x, int y, int p, uint8_t v, uint8_t face, uint8_t ink,
         gfx_vline(x + f - 1, y + 1, f - 2, sh);
     }
     if (p >= 14) {
-        tileLetter(x, y + (f - 9) / 2, f, l, ink, shadeOf(face));
+        tileLetter(x, y + (f - 9) / 2, f, l, ink, face == SILVER ? NAVY : ink == WHITE ? SKIN : shadeOf(face), shadeOf(face));
     }
     else if (l == 13 || l == 23) glyph(x + (f - 5) / 2, y + (f - 5) / 2, l == 13 ? WIDE_M : WIDE_W, 5, ink);
     else glyph(x + (f - 3) / 2, y + (f - 5) / 2, FONT35['A' + l - 1 - FONT35_FIRST], 3, ink);
@@ -477,7 +477,7 @@ static void rackTile(int x, int y, uint8_t t, uint8_t face) {
     gfx_hline(x + 1, y + 16, 11, shadeOf(face));
     gfx_vline(x + 12, y + 1, 15, shadeOf(face));
     if (t == wd::BLANK_TILE) return;
-    tileLetter(x, y + 2, 13, t, INK, shadeOf(face));
+    tileLetter(x, y + 2, 13, t, INK, shadeOf(face), shadeOf(face));
     char s[3];
     uint8_t val = wd::VALUE[t];
     fmtInt(s, val);
@@ -564,7 +564,7 @@ static void drawPicker(uint32_t frame) {
     for (uint8_t i = 0; i < 26; i++) {
         int x = 15 + (i % 7) * 14, y = 39 + (i / 7) * 13;
         if (i == pickSel) fillRound(x, y, 13, 13, 1, (frame & 16) ? FX_B : GOLD);
-        tileLetter(x, y + 2, 13, (uint8_t)(i + 1), i == pickSel ? INK : WHITE, i == pickSel ? WOOD : BLUE);
+        tileLetter(x, y + 2, 13, (uint8_t)(i + 1), i == pickSel ? INK : WHITE, i == pickSel ? WOOD : BLUE, i == pickSel ? WOOD : INK);
     }
 }
 

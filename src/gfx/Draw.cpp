@@ -226,18 +226,20 @@ RAMFUNC(glyph) void glyph(int x, int y, const uint8_t *cols, uint8_t ncols, uint
     }
 }
 
-RAMFUNC(tileletter) void tileLetter(int x, int y, int w, uint8_t letter, uint8_t c, uint8_t shadow) {
+static const uint8_t *tileGlyph(uint8_t letter) {
     const uint8_t *g = TILEFONT;
-    for (uint8_t k = 1; k < letter; k++) g += 1 + (((g[0] & 15) * ((g[0] >> 4) + 8) + 7) >> 3);
-    int gw = g[0] & 15, rows = (g[0] >> 4) + 8;
-    int left = (w - gw + 1) / 2 - 1;
-    if (left > w - 2 - gw) left = w - 2 - gw;          // letter and shadow short of the bevel
-    if (left < 0) left = 0;
-    x += left;
-    for (int pass = 0; pass < 2; pass++) {
-        uint8_t col = (pass ? c : shadow) & 0x0F;
-        int d = pass ? 0 : 1;
-        uint16_t bit = 0;
+    for (uint8_t k = 1; k < letter; k++) g += 1 + (((g[0] & 15) * ((g[0] >> 4) + 8) * 2 + 7) >> 3);
+    return g;
+}
+
+// The glyph at (x, y): its shadow, its half ink, its ink.
+RAMFUNC(tileglyph) static void tileDraw(const uint8_t *g, int x, int y, uint8_t c, uint8_t mid, uint8_t shadow) {
+    int gw = g[0] & 15, rows = (g[0] >> 4) + 8, n = gw * rows;
+    static const int8_t PLANE[3] = {0, 1, 0}, D[3] = {1, 0, 0};
+    for (int pass = 0; pass < 3; pass++) {
+        uint8_t col = (pass == 2 ? c : pass ? mid : shadow) & 0x0F;
+        int d = D[pass];
+        uint16_t bit = (uint16_t)(PLANE[pass] * n);
         for (int r = 0; r < rows; r++)
             for (int i = 0; i < gw; i++, bit++)
                 if ((g[1 + (bit >> 3)] << (bit & 7)) & 0x80) {
@@ -245,6 +247,26 @@ RAMFUNC(tileletter) void tileLetter(int x, int y, int w, uint8_t letter, uint8_t
                     if ((unsigned)xx < GFX_W && (unsigned)yy < GFX_H) plot(gfx_fb + yy * GFX_FB_STRIDE + (xx >> 1), xx, col);
                 }
     }
+}
+
+void tileLetter(int x, int y, int w, uint8_t letter, uint8_t c, uint8_t mid, uint8_t shadow) {
+    const uint8_t *g = tileGlyph(letter);
+    int gw = g[0] & 15;
+    int left = (w - gw + 1) / 2 - 1;
+    if (left > w - 2 - gw) left = w - 2 - gw;          // letter and shadow short of the bevel
+    if (left < 0) left = 0;
+    tileDraw(g, x + left, y, c, mid, shadow);
+}
+
+int tileText(int x, int y, const char *s, uint8_t c, uint8_t mid, uint8_t shadow, bool draw) {
+    int x0 = x;
+    for (; *s; s++) {
+        if (*s < 'A') { x += 4; continue; }
+        const uint8_t *g = tileGlyph((uint8_t)(*s - 'A' + 1));
+        if (draw) tileDraw(g, x, y, c, mid, shadow);
+        x += (g[0] & 15) + 1;
+    }
+    return x - x0;
 }
 
 RAMFUNC(text35) int text35(int x, int y, const char *str, uint8_t c) {

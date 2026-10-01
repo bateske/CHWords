@@ -230,7 +230,8 @@ def main():
     total += len(data)
 
     # The tiles' letters: per glyph a byte (width | (rows - 8) << 4), then
-    # its pixels row by row, MSB first, to the next byte.
+    # its ink pixels row by row and its half-ink pixels the same way, MSB
+    # first, to the next byte.
     glyphs, cur = {}, None
     for ln in (ART / "tilefont.txt").read_text().splitlines():
         if ln.startswith("= "):
@@ -243,7 +244,8 @@ def main():
         w = max(len(r) for r in rows)
         assert w <= 11 and 8 <= len(rows) <= 23, ch
         data.append(w | (len(rows) - 8) << 4)
-        bits = "".join(r.ljust(w, ".") for r in rows).replace("#", "1").replace(".", "0")
+        grid = "".join(r.ljust(w, ".") for r in rows)
+        bits = "".join("1" if v == "#" else "0" for v in grid) + "".join("1" if v == "+" else "0" for v in grid)
         bits += "0" * (-len(bits) % 8)
         data += [int(bits[k:k + 8], 2) for k in range(0, len(bits), 8)]
     defs.append(c_array("TILEFONT", data))
