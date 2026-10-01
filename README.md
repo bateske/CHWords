@@ -1,5 +1,71 @@
 # CHWords
 
+**WORDS**: a crossword tile game for the
+[CHGame](https://github.com/bateske/CH32SerialBoot) handheld, in the casino
+style of [CHBlackjack](https://github.com/bateske/CHBlackjack). Play the
+classic fifteen-by-fifteen board against three CPU opponents or a friend.
+14,160 words are built in, and a microSD card with the file `WORDS.DIC` on it
+brings that to all 168,551 words of the ENABLE list.
+
+## How to install
+
+There are two parts: the **dictionary file**, which goes on a microSD card,
+and the **game**, which goes onto the CHGame over USB. The card is optional:
+without it the game plays with the 14,160 words built into it. With it,
+every word you play is checked against all 168,551 words.
+
+### Step 1: put the dictionary on a microSD card
+
+1. **Download [`WORDS.DIC`](https://github.com/bateske/CHWords/raw/main/sdcard/WORDS.DIC)**
+   (4 MB). It is the file in this repository's [`sdcard`](sdcard) folder.
+2. **Use a microSD card formatted FAT32** (FAT16 works too). Cards of
+   32 GB or less come formatted that way, so a new one is ready as it is.
+   Cards of 64 GB and more come as exFAT, which the game cannot read: reformat
+   such a card as FAT32 first (or use a smaller card).
+3. **Copy `WORDS.DIC` to the top level of the card**, not into a folder,
+   and keep its name exactly `WORDS.DIC`. The card should look like this:
+
+       SD card
+       └── WORDS.DIC
+
+4. **Put the card in the CHGame's slot and switch it on.** The title screen
+   says **168551 WORDS ON THE CARD** when it has found the file, and
+   **14160 WORDS  NO CARD** when it has not. (A card put in later is found
+   the next time the title screen comes up.)
+
+### Step 2: put the game on the CHGame
+
+1. Install the **Arduino IDE 2.x** from <https://www.arduino.cc/en/software>.
+2. Add the **CHGame board package** (0.2.4 or later). In *File > Preferences*,
+   paste this into *Additional boards manager URLs*:
+
+       https://github.com/bateske/CH32SerialBoot/releases/latest/download/package_chgame_index.json
+
+   Then open *Tools > Board > Boards Manager*, search for **CHGame** and click
+   *Install*.
+3. Add the **CHGfx library** (1.3.0). On <https://github.com/bateske/CHGfx>
+   click *Code > Download ZIP*. Then in the IDE choose *Sketch > Include
+   Library > Add .ZIP Library...* and pick the zip you downloaded.
+4. **Download this game.** At the top of this page click *Code > Download
+   ZIP* and unzip it. **Rename the folder from `CHWords-main` to `CHWords`**:
+   the Arduino IDE only opens a sketch whose folder has the same name as its
+   `.ino` file.
+5. Open `CHWords/CHWords.ino` in the IDE and set:
+   - *Tools > Board*: **CHGame**
+   - *Tools > Optimize*: **Smallest + LTO**. The game does not fit without it.
+   - *Tools > USB*: **Upload only**
+   - *Tools > Port*: the CHGame's port
+6. Plug the CHGame in by USB and click **Upload** (the arrow button).
+
+The same from the command line:
+
+    arduino-cli compile -b CHGame:ch32v:CHGame:opt=oslto,rtlib=nano,periph=game,usb=uploadonly CHWords
+    arduino-cli upload  -b CHGame:ch32v:CHGame -p COMx CHWords
+
+That is 50.4 KB of the 50,944-byte program area. The last two flash pages are left for your saved game.
+
+## About the game
+
 A crossword tile game for the [CHGame](https://github.com/bateske/CH32SerialBoot)
 handheld (CH32X035 RISC-V, 128x128 colour LCD, piezo, microSD), in the casino
 of [CHBlackjack](https://github.com/bateske/CHBlackjack) and its tables: the
@@ -31,32 +97,6 @@ and graphics code and renders what the device shows. **The game has been
 built and checked in the simulator only.** On the handheld itself nothing
 has been run yet: the SD card reader, the CPU's thinking time and the frame
 times are still to be tried there.)
-
-## Installing
-
-You need the Arduino IDE (2.x) or `arduino-cli`, and:
-
-1. **The CHGame board package, 0.2.4 or later** (Boards Manager URL
-   `https://github.com/bateske/CH32SerialBoot/releases/latest/download/package_chgame_index.json`).
-2. **The CHGfx library, 1.3.0** from <https://github.com/bateske/CHgfx>.
-3. **This repository**, in a folder named `CHWords`.
-
-The game needs **link-time optimisation** to fit: pick *Tools > Optimize >
-Smallest + LTO*, and *Tools > USB > Upload only* (the game has no use for
-USB Serial, and uploading works as before). That is 50.4 KB of the
-50,944-byte application region, the last two flash pages left for your
-saved game. From the command line:
-
-    arduino-cli compile -b CHGame:ch32v:CHGame:opt=oslto,rtlib=nano,periph=game,usb=uploadonly CHWords
-    arduino-cli upload  -b CHGame:ch32v:CHGame -p COMx CHWords
-
-(`python tools/device.py build` does the same.)
-
-**The card (optional).** `python tools/dict/build_sd.py` writes
-`out/WORDS.DIC` (4 MB). Copy it to the root folder of a microSD card
-formatted FAT16 or FAT32 (not exFAT) and put the card in before switching
-on. The title screen says which list is in play: "168551 WORDS ON THE CARD"
-or "14160 WORDS  NO CARD".
 
 ## Playing
 
@@ -154,8 +194,9 @@ off it, dancing in the rainbow). Options, records and a game in progress
 * **The card's dictionary** (`src/dict/Dict.cpp`, built by
   `tools/dict/build_sd.py`) is a hash table of 512-byte blocks: a word is
   one block read, with no index in RAM. The card is read with a small
-  read-only driver (`src/sd`, from HypeRunner) that borrows the display's
-  SPI between frames and hands it back as it found it.
+  read-only driver (`src/sd`: CHSd, shared with CHCrossword and
+  CHWordWheel, from HypeRunner) that borrows the display's SPI between
+  frames and hands it back as it found it.
 * **The tiles are drawn, not stored**: rounded rectangles in two colours
   (the face and its thickness) and a letter - close up and in the rack in a
   serif face anti-aliased with one in-between tone, as in CHCrossword
@@ -177,11 +218,12 @@ off it, dancing in the rainbow). Options, records and a game in progress
     python tools/chsim/chdrive.py --sim . tools/scripts/ui.txt out/ui    # one script: screenshots in out/ui
     python tools/chsim/chdrive.py --sim . tools/scripts/gameplay.txt out/gameplay   # the reel at the top (showcase.txt: the rest)
     python tools/dict/build_dict.py --bytes 10898    # rebuild the built-in list to a flash budget
-    python tools/dict/build_sd.py    # out/WORDS.DIC, checked word by word
+    python tools/dict/build_sd.py    # sdcard/WORDS.DIC, checked word by word
     python tools/assets.py           # the glove, the arrow, the fonts -> src/assets
 
 The simulator needs a C++ compiler (`CHSIM_CXX`, zig, clang++ or g++; see
-`tools/chsim/chsim.py`). Set `CHWD_CARD=out/WORDS.DIC` to give it a card.
+`tools/chsim/chsim.py`). Set `CHWD_CARD=sdcard/WORDS.DIC` to give it a card (the simulator puts the
+file on a pretend FAT16 card, so the FAT code runs too).
 The word lists are downloaded on first use to `tools/dict/data/`
 (`tools/dict/wordlist.py`).
 

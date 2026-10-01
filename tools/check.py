@@ -9,7 +9,7 @@
   2. Every script in tools/scripts runs in the simulator twice: the two runs
      must draw identical frames (the game is deterministic), with no drawing
      into a frame still being sent (the simulator's BUG lines). Scripts named
-     card*.txt run with out/WORDS.DIC as the SD card (built if missing).
+     card*.txt run with sdcard/WORDS.DIC as the SD card (built if missing).
   3. The release build compiles for the device and fits (tools/check_size.py).
 
 Screenshots, contact sheets and GIFs are left in out/<script>/ to look at.
@@ -55,7 +55,7 @@ def drive(script, outdir):
     env = dict(os.environ)
     env.pop("CHWD_CARD", None)
     if Path(script).name.startswith("card"):
-        card = OUT / "WORDS.DIC"
+        card = ROOT / "sdcard" / "WORDS.DIC"
         if not card.exists():
             run([HERE / "dict" / "build_sd.py"])
         env["CHWD_CARD"] = str(card)

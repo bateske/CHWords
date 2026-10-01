@@ -16,8 +16,10 @@ Bold. DejaVu is freely redistributable: Bitstream Vera
 Fonts Copyright (c) 2003 Bitstream, Inc.; DejaVu changes are in the public
 domain (https://dejavu-fonts.github.io/License.html).
 
-The SD card reader (src/sd) is from HypeRunner's clean-room SPI-mode driver
-and FAT reader, cut down to read-only single-block reads:
+The SD card reader (src/sd, and the simulator's card in tools/chsim/host/
+sd_host.cpp and VCard.h) is CHSd, the library this game shares with
+CHCrossword and CHWordWheel: HypeRunner's clean-room SPI-mode driver and FAT
+reader, cut down to read-only single-block reads:
 
     MIT License. Copyright (c) 2026 bateske
 

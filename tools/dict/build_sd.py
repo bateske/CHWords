@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Build WORDS.DIC, the full word list for the SD card.
 
-    python tools/dict/build_sd.py            # -> out/WORDS.DIC (about 4 MB)
+    python tools/dict/build_sd.py            # -> sdcard/WORDS.DIC (about 4 MB)
 
-Copy the file to the root folder of a FAT16 or FAT32 card. With it in the
+The repository keeps the built file in sdcard/, laid out as it goes on the
+card: copy it to the root folder of a FAT16 or FAT32 card. With it in the
 slot the game checks your words against all of ENABLE (every word of 2 to
 15 letters: about 168,000) instead of the list in flash.
 
@@ -103,7 +104,7 @@ def lookup(data, word):
 def main():
     words = load_enable()
     data, seed, fullest = build(words)
-    out = ROOT / "out" / "WORDS.DIC"
+    out = ROOT / "sdcard" / "WORDS.DIC"
     out.parent.mkdir(exist_ok=True)
     out.write_bytes(data)
     print(f"{out}: {len(words)} words, {len(data)} bytes, seed {seed:#x}, fullest bucket {fullest} of 509 bytes")
