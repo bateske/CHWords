@@ -252,8 +252,12 @@ RAMFUNC(tileglyph) static void tileDraw(const uint8_t *g, int x, int y, uint8_t 
 void tileLetter(int x, int y, int w, uint8_t letter, uint8_t c, uint8_t mid, uint8_t shadow) {
     const uint8_t *g = tileGlyph(letter);
     int gw = g[0] & 15;
-    int left = (w - gw + 1) / 2 - 1;
-    if (left > w - 2 - gw) left = w - 2 - gw;          // letter and shadow short of the bevel
+    // A pixel left of centre (the shadow balances it), but the wide letters
+    // (9 px and more: A B D G H K M N O Q R U V W X) a pixel further right,
+    // where they look centred; for M and W the shadow then runs onto the
+    // bevel, which is its colour.
+    int left = (w - gw + 1) / 2 - 1 + (gw >= 9);
+    if (left > w - 1 - gw) left = w - 1 - gw;
     if (left < 0) left = 0;
     tileDraw(g, x + left, y, c, mid, shadow);
 }
