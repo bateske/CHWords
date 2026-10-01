@@ -13,6 +13,7 @@
 #include "../audio/Audio.h"
 #include "../ai/Ai.h"
 #include "../dict/Dict.h"
+#include "../dict/DictData.h"
 #include "../game/Game.h"
 #include "../stage/Stage.h"
 #include "../save/Save.h"
@@ -698,8 +699,9 @@ static void playRender(uint32_t frame) {
 // Options (device debug builds leave the screen out to fit the protocol)
 // ---------------------------------------------------------------------------
 #if !CHWD_LEAN
-enum Opt : uint8_t { O_SOUND, O_FELT, O_BACK, OPT_COUNT };
-static const char *const OPT_TEXT[OPT_COUNT] = {"SOUND|OFF|ON", "FELT|GREEN|BLUE|RED|PURPLE", "BACK"};
+enum Opt : uint8_t { O_SOUND, O_FELT, O_WORDS, O_BACK, OPT_COUNT };
+static const char *const OPT_TEXT[OPT_COUNT] = {"SOUND|OFF|ON", "FELT|GREEN|BLUE|RED|PURPLE", "WORDS", "BACK"};
+static bool wordsInfo;               // the panel on the word lists is up
 static uint8_t &optByte(uint8_t i) { return ((uint8_t *)&opt)[i]; }
 
 static uint8_t optField(const char *s, uint8_t k, char *buf) {
@@ -715,11 +717,22 @@ static uint8_t optField(const char *s, uint8_t k, char *buf) {
 }
 
 static void optionsUpdate() {
+    if (wordsInfo) {
+        if (arduboy.justPressed(A_BUTTON | B_BUTTON)) { wordsInfo = false; audio::sfx(Sfx::Select); }
+        return;
+    }
+    if (arduboy.justPressed(A_BUTTON) && sel == O_WORDS) {
+        gfx_wait();
+        dict::begin();               // a card put in since?
+        wordsInfo = true;
+        audio::sfx(Sfx::Select);
+        return;
+    }
     if (arduboy.repeat(UP_BUTTON)) { sel = (uint8_t)((sel + OPT_COUNT - 1) % OPT_COUNT); audio::sfx(Sfx::Cursor); }
     if (arduboy.repeat(DOWN_BUTTON)) { sel = (uint8_t)((sel + 1) % OPT_COUNT); audio::sfx(Sfx::Cursor); }
     int d = arduboy.justPressed(RIGHT_BUTTON) ? 1 : (arduboy.justPressed(LEFT_BUTTON) ? -1 : 0);
-    if (arduboy.justPressed(A_BUTTON) && sel != O_BACK) d = 1;
-    if (d && sel != O_BACK) {
+    if (arduboy.justPressed(A_BUTTON) && sel < O_WORDS) d = 1;
+    if (d && sel < O_WORDS) {
         char tmp[12];
         uint8_t n = (uint8_t)(optField(OPT_TEXT[sel], 0, tmp) - 1);
         uint8_t &f = optByte(sel);
@@ -741,16 +754,36 @@ static void optionsRender(uint32_t frame) {
         int y = 32 + i * 16;
         char label[12], value[12];
         optField(OPT_TEXT[i], 0, label);
-        if (i == sel) {
+        if (i == sel && !wordsInfo) {
             fillRound(8, y - 3, 112, 15, 3, NAVY);
             roundRect(8, y - 3, 112, 15, 3, (frame & 16) ? FX_B : GOLD);
         }
-        if (i == O_BACK) { centred2(y, label, i == sel ? GOLD : WHITE); continue; }
+        if (i >= O_WORDS) { centred2(y, label, i == sel ? GOLD : WHITE); continue; }
         fontText(13, y, label, i == sel ? GOLD : WHITE);
         optField(OPT_TEXT[i], (uint8_t)(optByte(i) + 1), value);
         fontText(115 - fontWidth(value, 0), y, value, i == sel ? WHITE : FELT_LT, 0);
     }
-    centred35(95, "SELECT IN A GAME: A HINT", FELT_LT);
+    centred35(97, "SELECT IN A GAME: A HINT", FELT_LT);
+    if (wordsInfo) {
+        // How many words, and how to get the rest.
+        panel(18, 92);
+        centred2(22, "WORDS", FX_B);
+        char buf[32];
+        fmtStr(fmtInt(fmtStr(buf, "BUILT IN: "), DICT_WORDS), " WORDS");
+        centred35(40, buf, WHITE);
+        if (dict::card()) {
+            fmtStr(fmtInt(fmtStr(buf, "ON THE CARD: "), (int32_t)dict::count()), " WORDS");
+            centred35(50, buf, CYAN);
+            centred35(66, "THE CARD'S LIST IS IN USE.", SILVER);
+        } else {
+            centred35(50, "WITH THE SD CARD: 168551", CYAN);
+            centred35(62, "PUT THE FILE  WORDS.DIC", SILVER);
+            centred35(70, "IN THE TOP FOLDER OF A", SILVER);
+            centred35(78, "FAT32 SD CARD, PUT THE", SILVER);
+            centred35(86, "CARD IN, AND SWITCH ON.", SILVER);
+        }
+        centred35(100, "A OR B: BACK", GOLD);
+    }
     centred35(109, "WORDS: THE ENABLE LIST", SILVER);
     centred35(116, "3X5 FONT: PRESS PLAY ON TAPE", SILVER);
 }
