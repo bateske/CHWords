@@ -1,0 +1,55 @@
+# A gameplay reel against the HIGH ROLLER (docs/gameplay.gif), played with the
+# D-pad as a player would: the camera whipping in, PLAYERS laid out tile by
+# tile across the centre for a bingo, the CPU thinking over the whole board
+# and its tiles dropping in close up, a hint laid out and played, a look at
+# the whole board (B held), and another hint. Only the first rack is set.
+#   python tools/chsim/chdrive.py --sim . tools/scripts/gameplay.txt out/gameplay
+say G 0 2 11
+say R PLAYERS
+rec start 3
+wait 24
+tap LEFT
+wait 6
+tap LEFT
+wait 6
+tap LEFT
+wait 8
+tap A
+wait 10
+tap A
+wait 8
+tap A
+wait 8
+tap A
+wait 8
+tap A
+wait 8
+tap A
+wait 8
+tap A
+wait 8
+tap A
+wait 18
+tap START
+wait 16
+tap A
+waitturn 10
+tap SELECT
+wait 40
+waitturn 24
+tap START
+wait 14
+tap A
+waitturn 12
+hold B
+wait 50
+release
+wait 16
+tap SELECT
+wait 40
+waitturn 24
+tap START
+wait 14
+tap A
+waitturn 30
+rec stop gameplay

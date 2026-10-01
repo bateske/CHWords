@@ -18,11 +18,13 @@ in 12.4 KB of a 50 KB program, so it plays with nothing in the card slot;
 put the file `WORDS.DIC` on a microSD card and your words are checked
 against **all 168,551 words** of the ENABLE list (2 to 15 letters) instead.
 
-![Seven tiles across the centre: BINGO](docs/bingo.gif)
+![Twenty seconds against the HIGH ROLLER: PLAYERS across the centre for a bingo, the CPU thinking over the whole board and dropping its word in close up, two hints, and a look at the whole board](docs/gameplay.gif)
 
-| Title | The CPU's reply | A hint | The end of a game |
-|---|---|---|---|
-| ![title](docs/title.gif) | ![cpu](docs/cpu.gif) | ![hint](docs/hint.gif) | ![win](docs/win.gif) |
+| Title | A bingo | The CPU's reply |
+|---|---|---|
+| ![title](docs/title.gif) | ![bingo](docs/bingo.gif) | ![cpu](docs/cpu.gif) |
+| **A hint** | **The end of a game** | |
+| ![hint](docs/hint.gif) | ![win](docs/win.gif) | |
 
 (Captured from the PC simulator in `tools/chsim`, which runs the real game
 and graphics code and renders what the device shows. **The game has been
@@ -69,8 +71,9 @@ or "16142 WORDS  NO CARD".
 The rules are the ones you know. The first word crosses the centre star;
 every later play joins the tiles already down, all its tiles in one row or
 column, and every word it makes, across and down, must be a word. Letters
-score their face value, doubled or tripled on the light and dark blue
-squares; the wine and red squares double and triple the whole word. A
+score their face value, doubled or tripled on the blue and navy squares
+(DL, TL); the wine and red squares (DW, TW) double and triple the whole
+word. A
 premium square counts once, for the play that covers it. All seven tiles in
 one play earn 50 more. A blank stands for any letter and scores nothing.
 The game ends when the bag is empty and someone plays their last tile (they
@@ -92,8 +95,9 @@ the camera following the cursor (and keeping the first tile of the word you
 are laying in view). Hold B to see the whole board; let go to come back. The
 premium squares are set into the board, blue for the letter premiums (DL,
 TL) and red for the word premiums (DW, TW); from far off they show just
-"2" or "3". Tiles you are laying are grey and blue, like the dark pieces of the chess set, and held up off the board; the
-last play made stays gold until the next.
+"2" or "3". Tiles you are laying are grey and blue, like the dark pieces of
+the chess set, and held up off the board; the last play made stays gold
+until the next.
 
 **Which words count.** With the card in, any ENABLE word. Without it, the
 16,142 in the game: every two- and three-letter word, the most common
@@ -155,8 +159,7 @@ the felt (green, blue, red, purple). Options, records and a game in progress
   serif face (DejaVu Serif Bold, 297 bytes for all 26), far off in the 3x5
   font. The board is drawn at any square size from 8 to 16 pixels, which is
   what lets the camera whip between them. The only stored art is the glove
-  (CHChess's), the arrow for the way a word runs
-  and the display font.
+  (CHChess's), the arrow for the way a word runs and the display font.
 * **Flash** (release build): 50,428 of 50,944 bytes, of which the dictionary
   is 12,270. The camera, the raised tiles and the serif letters cost about
   3 KB, which is about 4,000 words of the built-in list; with a card in it
@@ -168,6 +171,7 @@ the felt (green, blue, red, purple). Options, records and a game in progress
     python tools/check.py            # host tests, every script in the simulator (twice), the device build
     python tools/tests/run_tests.py  # the host tests alone
     python tools/chsim/chdrive.py --sim . tools/scripts/ui.txt out/ui    # one script: screenshots in out/ui
+    python tools/chsim/chdrive.py --sim . tools/scripts/gameplay.txt out/gameplay   # the reel at the top (showcase.txt: the rest)
     python tools/dict/build_dict.py --bytes 12274    # rebuild the built-in list to a flash budget
     python tools/dict/build_sd.py    # out/WORDS.DIC, checked word by word
     python tools/assets.py           # the glove, the arrow, the fonts -> src/assets
@@ -178,7 +182,7 @@ The word lists are downloaded on first use to `tools/dict/data/`
 (`tools/dict/wordlist.py`).
 
 The host tests check every word of the built-in list both ways (found by
-lookup, given once by the scan), a quarter of a million near misses and the
+lookup, given once by the scan), about 200,000 near misses and the
 rest of ENABLE (not found), the rules against a second implementation, and
 600 games between two CPUs in which every play is checked the plain way:
 legal, scored right, every word it makes in the list, the tiles from the
